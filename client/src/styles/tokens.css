@@ -1,0 +1,114 @@
+/*
+ * Design tokens.
+ *
+ * VISUAL BRIEF: institutional but humane. Calm, legible, dignified. This is a
+ * civic tool used by people under real strain and by officials making welfare
+ * decisions, so it deliberately avoids consumer-app and "AI startup" cues —
+ * no dark mode, no neon gradients, no glow, no high-saturation accents.
+ *
+ * Two decisions worth knowing about:
+ *
+ * 1. FONTS ARE SYSTEM STACKS, not webfonts. A hosted font is a network
+ *    dependency, and this app has to survive a bad venue network during a live
+ *    demo. A serif for headings paired with a humanist sans for body text gives
+ *    the institutional-document feel without fetching anything.
+ *
+ * 2. RISK COLOURS ARE MUTED ON PURPOSE. A traffic-light red for a distressed
+ *    person is alarming to a victim reading their own screen and desensitising
+ *    to staff reading dozens of cases. These are earth tones — sage, ochre,
+ *    terracotta, clay — that remain distinguishable and carry escalating
+ *    weight without shouting. Risk level is never signalled by colour alone;
+ *    it always carries a text label too.
+ */
+
+:root {
+  /* --- Surfaces ----------------------------------------------------------- */
+  --paper: #fbf9f5; /* warm off-white page; stark white reads clinical */
+  --surface: #ffffff;
+  --surface-sunken: #f4f1ea;
+
+  /* --- Ink ---------------------------------------------------------------- */
+  --ink: #1c1f26;
+  --ink-soft: #454b58;
+  --ink-muted: #6b7280;
+
+  /* --- Structure ---------------------------------------------------------- */
+  --line: #e3ddd2;
+  --line-strong: #cdc5b6;
+
+  /* --- Institutional accent ---------------------------------------------- */
+  --accent: #24484f; /* deep muted teal-slate */
+  --accent-soft: #e8eef0;
+  --accent-ink: #12292e;
+
+  /* --- Risk bands (muted, never alarming) -------------------------------- */
+  --risk-low: #5f7a5f; /* sage */
+  --risk-low-bg: #eef2ec;
+  --risk-moderate: #a67c3d; /* ochre */
+  --risk-moderate-bg: #f7f0e3;
+  --risk-high: #a8503c; /* terracotta */
+  --risk-high-bg: #f8ebe6;
+  --risk-urgent: #7d3328; /* deep clay */
+  --risk-urgent-bg: #f4e4e0;
+
+  /* --- Type -------------------------------------------------------------- */
+  --font-heading: ui-serif, 'Iowan Old Style', 'Palatino Linotype', Palatino,
+    'Book Antiqua', Georgia, 'Times New Roman', serif;
+  --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', Menlo, Consolas,
+    monospace;
+
+  /* --- Spacing / shape --------------------------------------------------- */
+  --radius-sm: 4px;
+  --radius: 8px;
+  --radius-lg: 14px;
+  --shadow-soft: 0 1px 2px rgba(28, 31, 38, 0.04), 0 2px 8px rgba(28, 31, 38, 0.04);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+/* Visible focus ring everywhere — this app will be used by people navigating
+   by keyboard and on assistive tech, and a suppressed outline is a real
+   accessibility failure, not a style choice. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Screen-reader-only utility. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

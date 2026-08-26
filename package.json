@@ -1,0 +1,27 @@
+{
+  "name": "sih26094-distress-monitor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "SIH26094 — AI-based dynamic mental health monitoring and distress prediction for victims/complainants under the SC/ST (Prevention of Atrocities) Act, 1989. Hackathon prototype.",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,magenta \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "npm run dev --workspace server",
+    "dev:client": "npm run dev --workspace client",
+    "build": "npm run build --workspace client",
+    "test": "npm run test --workspace server",
+    "test:e2e": "playwright test",
+    "verify:safety": "npm run verify:safety --workspace server"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "concurrently": "^10.0.5"
+  }
+}
