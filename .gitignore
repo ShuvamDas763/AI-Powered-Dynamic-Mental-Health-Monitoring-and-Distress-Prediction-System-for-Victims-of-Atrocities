@@ -1,0 +1,58 @@
+# ---------------------------------------------------------------------------
+# Secrets — NEVER commit these.
+# The real API key lives in .env (git-ignored). .env.example is the committed
+# template showing which keys a teammate needs to fill in.
+# ---------------------------------------------------------------------------
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Build output
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# Local data store (seeded at runtime — regenerate, don't commit)
+*.sqlite
+*.sqlite3
+*.db
+data/local/
+
+# Test / tooling artefacts
+coverage/
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+
+# Python (if any tooling scripts are added)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor / OS noise
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Claude Code local settings (machine-specific permissions)
+.claude/settings.local.json
