@@ -15,6 +15,7 @@
     "build": "npm run build --workspace client",
     "test": "npm run test --workspace server",
     "test:e2e": "playwright test",
+    "personas": "npm run personas --workspace server",
     "verify:safety": "npm run verify:safety --workspace server"
   },
   "engines": {

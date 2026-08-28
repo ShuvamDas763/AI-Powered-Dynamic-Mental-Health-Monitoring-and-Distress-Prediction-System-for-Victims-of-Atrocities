@@ -56,3 +56,7 @@ desktop.ini
 
 # Claude Code local settings (machine-specific permissions)
 .claude/settings.local.json
+
+# Agent tooling installed locally (third-party plugin checkouts, each with its
+# own .git). Machine-local developer tooling, not part of this project.
+.agents/

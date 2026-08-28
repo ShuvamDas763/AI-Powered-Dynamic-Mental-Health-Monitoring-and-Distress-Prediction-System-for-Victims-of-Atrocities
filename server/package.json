@@ -8,6 +8,7 @@
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
     "test": "node --test \"src/**/*.test.js\"",
+    "personas": "node scripts/persona-report.js",
     "verify:safety": "node scripts/verify-model-safety.js"
   },
   "dependencies": {

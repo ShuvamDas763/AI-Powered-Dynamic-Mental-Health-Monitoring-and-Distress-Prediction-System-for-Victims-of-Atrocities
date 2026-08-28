@@ -51,7 +51,37 @@ export const config = Object.freeze({
 
   llm: Object.freeze({
     apiKey: hasRealKey ? groqApiKey : null,
-    model: process.env.GROQ_MODEL?.trim() || 'llama-3.3-70b-versatile',
+
+    /**
+     * Primary model for scoring, explainability text and intervention wording.
+     *
+     * The default here must name a model this account can actually serve. An
+     * earlier default named a model that does not exist on the account, which
+     * fails only at the first live call — long after startup, and looking like a
+     * network fault rather than a config one. See docs/model-selection.md.
+     */
+    model: process.env.GROQ_MODEL?.trim() || 'openai/gpt-oss-120b',
+
+    /**
+     * Secondary model, used only when the primary errors or times out, before
+     * giving up to a cached response.
+     *
+     * Stays secondary permanently. The Phase 1 probe found it both scored the
+     * witness-intimidation case lower than the primary did and was the more
+     * susceptible of the two to prompt injection. It is faster, and that is not
+     * a good enough reason to promote it.
+     */
+    modelFallback: process.env.GROQ_MODEL_FALLBACK?.trim() || 'qwen/qwen3.8-27b',
+
+    /**
+     * Moderation pass over generated text before any of it reaches a screen.
+     *
+     * A runtime gate, not a formality. The content-safety rules (no diagnostic
+     * labels, nothing graphic, nothing that reads like real case reporting) are
+     * stated in the system prompt, but a prompt is a request and this is a check.
+     */
+    modelModeration: process.env.GROQ_MODEL_MODERATION?.trim() || 'openai/gpt-oss-safeguard-20b',
+
     timeoutMs: intFromEnv('LLM_TIMEOUT_MS', 8000),
 
     /**
