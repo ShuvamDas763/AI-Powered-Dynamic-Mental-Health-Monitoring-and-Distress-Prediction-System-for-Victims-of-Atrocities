@@ -30,6 +30,8 @@ export const PRIORITY_USE_CASE = Object.freeze({
   WITNESS_INTIMIDATION: 'witness_intimidation',
   /** Docket recorded under one of the grave-offence priority categories. */
   GRAVE_OFFENCE: 'grave_offence',
+  /** Sexual assault case category — NALSA/One Stop Centre referral path. */
+  SEXUAL_ASSAULT: 'sexual_assault',
   /** Family/household affected by caste-based violence (secondary victims). */
   CASTE_VIOLENCE_FAMILY: 'caste_violence_family',
   /** Baseline: every case in this system is an SC/ST (PoA) Act 1989 matter. */
@@ -50,6 +52,7 @@ export const PRIORITY_USE_CASE = Object.freeze({
 export const PRIORITY_WEIGHTS = Object.freeze({
   [PRIORITY_USE_CASE.WITNESS_INTIMIDATION]: 1.3,
   [PRIORITY_USE_CASE.GRAVE_OFFENCE]: 1.25,
+  [PRIORITY_USE_CASE.SEXUAL_ASSAULT]: 1.25,
   [PRIORITY_USE_CASE.CASTE_VIOLENCE_FAMILY]: 1.15,
   [PRIORITY_USE_CASE.SC_ST_ACT_BENEFICIARY]: 1.0,
 });
@@ -60,6 +63,8 @@ const PRIORITY_LABELS = Object.freeze({
     'Witness in an active matter, with intimidation risk recorded',
   [PRIORITY_USE_CASE.GRAVE_OFFENCE]:
     'Docket recorded under a grave-offence priority category',
+  [PRIORITY_USE_CASE.SEXUAL_ASSAULT]:
+    'Sexual assault case category — One Stop Centre referral path',
   [PRIORITY_USE_CASE.CASTE_VIOLENCE_FAMILY]:
     'Household affected by caste-based violence',
   [PRIORITY_USE_CASE.SC_ST_ACT_BENEFICIARY]:

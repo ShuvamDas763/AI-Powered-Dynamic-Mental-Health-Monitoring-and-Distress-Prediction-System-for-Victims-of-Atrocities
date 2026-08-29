@@ -14,7 +14,12 @@
  * sitting untested until the moment it matters.
  */
 
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import path from 'path';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
 /** Read an integer env var, falling back to `fallback` if unset or unparseable. */
 function intFromEnv(name, fallback) {

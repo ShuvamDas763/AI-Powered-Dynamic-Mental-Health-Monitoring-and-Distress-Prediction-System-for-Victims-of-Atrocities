@@ -32,7 +32,7 @@ const reply = (text) => [
 ];
 
 describe('seeding', () => {
-  test('all six personas are loaded with history and a scored series', () => {
+  test('all personas are loaded with history and a scored series', () => {
     const s = fresh();
     assert.equal(s.listCases().length, PERSONA_KEYS.length);
     for (const c of s.listCases()) {

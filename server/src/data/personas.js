@@ -1,5 +1,5 @@
 /**
- * The six synthetic personas from spec Section 6.
+ * The eight synthetic personas from spec Section 6.
  *
  * CONTENT RULES THAT GOVERN THIS FILE
  * -------------------------------------------------------------------------
@@ -511,7 +511,170 @@ const PERSONA_F = {
   ],
 };
 
-const PERSONA_SEED = Object.freeze([PERSONA_A, PERSONA_B, PERSONA_C, PERSONA_D, PERSONA_E, PERSONA_F]);
+/**
+ * PERSONA G — registered complainant, sexual assault case category.
+ * Spec target: high/urgent flag — trauma counselling + legal aid, careful
+ * escalation framing given heightened sensitivity of this category.
+ *
+ * Early post-registration. Withdrawal from check-ins, explicit requests for
+ * privacy and a female counsellor where offered, hesitancy engaging with any
+ * content referencing court dates. The escalation route is the ordinary
+ * threshold path, raised by the grave-offence priority weight — no hard
+ * trigger fires here, which is deliberate: this case needs prompt attention
+ * through the same rule as every other, not a special path.
+ */
+const PERSONA_G = {
+  case: {
+    key: 'G',
+    caseId: 'SIH-CASE-0007',
+    pseudonym: 'Complainant G',
+    district: 'Demo District 3',
+    state: 'Demo State 2',
+    caseStage: 'investigation',
+    monthsSinceRegistration: 2,
+    priorityTags: [PRIORITY_USE_CASE.SC_ST_ACT_BENEFICIARY, PRIORITY_USE_CASE.SEXUAL_ASSAULT],
+    preferredLocale: LOCALE.EN,
+    contextNote: 'Registered complainant. Early investigation stage. Privacy-sensitive. Withdrawal from check-ins.',
+  },
+  history: [
+    {
+      daysAgo: 56, channel: CHANNEL.APP, responseLatencyHours: 3, surfaceSentiment: 52,
+      turns: exchange(PROMPT.EN_GENERAL,
+        'I am willing to do these check ins but I want to know who can see my answers. ' +
+        'Is this going to the police or only to a counsellor? I was told this is confidential.'),
+      signalPhrases: ['I want to know who can see my answers'],
+    },
+    {
+      daysAgo: 48, channel: CHANNEL.APP, responseLatencyHours: 6, surfaceSentiment: 60,
+      turns: exchange(PROMPT.EN_SUPPORT,
+        'I would prefer to speak with a woman about this if that is possible. ' +
+        'I do not feel comfortable discussing some things otherwise.'),
+      signalPhrases: ['I would prefer to speak with a woman'],
+    },
+    {
+      daysAgo: 39, channel: CHANNEL.APP, responseLatencyHours: 10, surfaceSentiment: 68,
+      turns: exchange(PROMPT.EN_WEEK,
+        'I do not want to talk about the hearing. I know it is coming up but I would rather ' +
+        'not think about it right now. Nothing else to say.'),
+      signals: [SIGNAL.DEFLECTION],
+      signalPhrases: ['I do not want to talk about the hearing'],
+    },
+    { daysAgo: 31, channel: CHANNEL.APP, status: CHECK_IN_STATUS.MISSED },
+    {
+      daysAgo: 23, channel: CHANNEL.APP, responseLatencyHours: 20, surfaceSentiment: 74,
+      turns: exchange(PROMPT.EN_GENERAL,
+        'I do not need this many check ins. It is not helping to keep going over the same things.'),
+      signals: [SIGNAL.DISENGAGEMENT],
+      signalPhrases: ['I do not need this many check ins'],
+    },
+    { daysAgo: 16, channel: CHANNEL.APP, status: CHECK_IN_STATUS.MISSED },
+    {
+      daysAgo: 8, channel: CHANNEL.SMS, responseLatencyHours: 36, surfaceSentiment: 80,
+      turns: exchange(PROMPT.EN_GENERAL, 'I would like fewer messages for now. I am managing.'),
+      signals: [SIGNAL.DISENGAGEMENT],
+      signalPhrases: ['I would like fewer messages for now'],
+    },
+    {
+      daysAgo: 2, channel: CHANNEL.SMS, responseLatencyHours: 50, surfaceSentiment: 85,
+      turns: exchange(PROMPT.EN_SUPPORT, 'I need some space. Please reduce the check ins.'),
+      signals: [SIGNAL.DISENGAGEMENT],
+      signalPhrases: ['I need some space'],
+    },
+  ],
+};
+
+/**
+ * PERSONA H — family complainant, grievous hurt / property loss category
+ * (arson-adjacent), mid-process.
+ * Spec target: moderate-high distress — financial assistance + rehabilitation +
+ * legal aid. Tests that the system recognises distress expressed as financial
+ * hardship and rebuilding stress rather than only violence-related language.
+ *
+ * H carries the grave-offence tag because the underlying docket qualifies, but
+ * the distress signal here is economic and procedural, not intimidation or
+ * hopelessness. The raw score lands near the top of MODERATE; with the grave-
+ * offence weight the adjusted score approaches but stays below the escalation
+ * threshold, so H is correctly identified as needing support without being
+ * pushed into the urgent review queue.
+ */
+const PERSONA_H = {
+  case: {
+    key: 'H',
+    caseId: 'SIH-CASE-0008',
+    pseudonym: 'Complainant H',
+    district: 'Demo District 3',
+    state: 'Demo State 2',
+    caseStage: 'chargesheet_filed',
+    monthsSinceRegistration: 8,
+    priorityTags: [PRIORITY_USE_CASE.SC_ST_ACT_BENEFICIARY, PRIORITY_USE_CASE.GRAVE_OFFENCE],
+    preferredLocale: LOCALE.EN,
+    contextNote: 'Family member of a registered complainant. Property loss and financial hardship. Rebuilding concerns.',
+  },
+  history: [
+    {
+      daysAgo: 84, channel: CHANNEL.APP, responseLatencyHours: 4, surfaceSentiment: 42,
+      turns: exchange(PROMPT.EN_GENERAL,
+        'We had to leave the house after the incident and we have been staying with relatives. ' +
+        'The property damage has not been assessed yet and I do not know when it will be. ' +
+        'Work has been hard to get to because of the travel.'),
+      signals: [SIGNAL.ECONOMIC_PRESSURE],
+      signalPhrases: ['The property damage has not been assessed yet', 'Work has been hard to get to'],
+    },
+    {
+      daysAgo: 70, channel: CHANNEL.APP, responseLatencyHours: 5, surfaceSentiment: 48,
+      turns: exchange(PROMPT.EN_GENERAL,
+        'I asked the office about compensation last week and they said the file is still being ' +
+        'processed. I need to know when the amount will come through because we cannot keep ' +
+        'staying at my brother place indefinitely.'),
+      signals: [SIGNAL.ECONOMIC_PRESSURE],
+      signalPhrases: ['we cannot keep staying at my brother place indefinitely'],
+    },
+    {
+      daysAgo: 56, channel: CHANNEL.APP, responseLatencyHours: 6, surfaceSentiment: 54,
+      turns: exchange(PROMPT.EN_WEEK,
+        'Same situation. Still at my brother place. The children are finding it hard to settle ' +
+        'and I am spending most of what I earn on transport to the office for follow ups.'),
+      signals: [SIGNAL.ECONOMIC_PRESSURE, SIGNAL.PROCESS_FATIGUE],
+      signalPhrases: ['spending most of what I earn on transport'],
+    },
+    {
+      daysAgo: 42, channel: CHANNEL.APP, responseLatencyHours: 8, surfaceSentiment: 58,
+      turns: exchange(PROMPT.EN_SUPPORT,
+        'Is there any help available for rebuilding? We lost most of what was in the house and ' +
+        'the insurance will not cover it. I have been told to apply but I do not know the process.'),
+      signals: [SIGNAL.ECONOMIC_PRESSURE],
+      signalPhrases: ['We lost most of what was in the house'],
+    },
+    { daysAgo: 30, channel: CHANNEL.APP, status: CHECK_IN_STATUS.MISSED },
+    {
+      daysAgo: 21, channel: CHANNEL.APP, responseLatencyHours: 12, surfaceSentiment: 60,
+      turns: exchange(PROMPT.EN_GENERAL,
+        'The compensation is still pending. I went to the office again and was told to wait. ' +
+        'I have used up my savings paying for the children school fees and the temporary rent.'),
+      signals: [SIGNAL.ECONOMIC_PRESSURE, SIGNAL.PROCESS_FATIGUE],
+      signalPhrases: ['I have used up my savings'],
+    },
+    {
+      daysAgo: 10, channel: CHANNEL.SMS, responseLatencyHours: 18, surfaceSentiment: 52,
+      turns: exchange(PROMPT.EN_GENERAL,
+        'Still waiting on the compensation. I was told it should come this month but I have ' +
+        'heard that before. I am managing but it is difficult.'),
+      signals: [SIGNAL.ECONOMIC_PRESSURE],
+      signalPhrases: ['I have heard that before'],
+    },
+    {
+      daysAgo: 3, channel: CHANNEL.SMS, responseLatencyHours: 24, surfaceSentiment: 48,
+      turns: exchange(PROMPT.EN_GENERAL,
+        'No update on the money yet. I am keeping up with the check ins because I want to ' +
+        'know if there is anything else I can apply for. The children are back in school at ' +
+        'least, which is something.'),
+      signals: [SIGNAL.ECONOMIC_PRESSURE],
+      signalPhrases: ['I want to know if there is anything else I can apply for'],
+    },
+  ],
+};
+
+const PERSONA_SEED = Object.freeze([PERSONA_A, PERSONA_B, PERSONA_C, PERSONA_D, PERSONA_E, PERSONA_F, PERSONA_G, PERSONA_H]);
 
 /** Persona keys in spec order. */
 export const PERSONA_KEYS = Object.freeze(PERSONA_SEED.map((p) => p.case.key));
@@ -562,10 +725,21 @@ export const PERSONA_TARGETS = Object.freeze({
     expectTrigger: TRIGGER.SUSTAINED_SURFACE_MISMATCH,
     forbiddenBands: [BAND.LOW],
   },
+  G: {
+    specTarget: 'high/urgent flag — trauma counselling + legal aid, careful escalation framing',
+    bands: [BAND.HIGH],
+    escalates: true,
+    expectTrigger: TRIGGER.THRESHOLD_CROSSED,
+  },
+  H: {
+    specTarget: 'moderate-high distress — financial assistance + rehabilitation + legal aid',
+    bands: [BAND.MODERATE, BAND.ELEVATED],
+    escalates: false,
+  },
 });
 
 /**
- * Build the six cases with their histories, resolved against a clock.
+ * Build the eight cases with their histories, resolved against a clock.
  *
  * Pass a fixed `now` in tests for determinism; the running server passes the real
  * one so a demo six months from now still shows a recent history instead of dates

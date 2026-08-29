@@ -8,6 +8,11 @@ and victims registered under the **SC/ST (Prevention of Atrocities) Act, 1989**.
 Built for Smart India Hackathon 2026, Problem Statement **SIH26094** (Ministry
 of Social Justice & Empowerment).
 
+> **⚠ TEMPORARY REVIEW DEPLOYMENT** — This is a temporary deployment with
+> **synthetic data only**. There is no real victim data, no real case data,
+> and no real personal information. All personas are fictional constructs.
+> Do not share this URL publicly.
+
 ## What this is, and what it is not
 
 This is a **decision-support triage prototype**. It is deliberately honest about
@@ -20,7 +25,7 @@ its limits, and so is its interface:
   code, or this document.
 - **A person always decides.** The system flags cases for human review. It never
   auto-acts on anyone.
-- All data in this repository is **synthetic**. The six demonstration personas
+- All data in this repository is **synthetic**. The eight demonstration personas
   come from Section 6 of the project spec and contain no real names, no real
   case details, and no incident description of any kind.
 
@@ -34,14 +39,15 @@ record of what actually exists — check it before demoing anything.
 | Phase | Scope | Status |
 |---|---|---|
 | 1 | Scaffold, two-tier access-control skeleton | **Done** |
-| 2 | Core data layer — personas, check-in and score schemas | Not started |
-| 3 | AI layer — scoring, explainability, interventions, fallback | Not started |
-| 4 | Victim-facing check-in UI, multilingual toggle | Not started |
-| 5 | Counsellor dashboard — case view, trends, alerts | Not started |
-| 6 | Admin dashboard — aggregate/anonymised view | Not started |
-| 7 | Integration pass, persona seeding | Not started |
-| 8 | Edge-case pass (Persona F) | Not started |
-| 9 | Polish — design, copy, responsive, docs | Not started |
+| 2 | Core data layer — personas, check-in and score schemas | **Done** |
+| 3 | AI layer — scoring, explainability, interventions, fallback | **Done** |
+| 4 | Victim-facing check-in UI, multilingual toggle | **Done** |
+| 5 | Counsellor dashboard — case view, trends, alerts | **Done** |
+| 6 | Admin dashboard — aggregate/anonymised view | **Done** |
+| 7 | Integration pass, persona seeding | **Done** |
+| 8 | Edge-case pass (Persona F) | **Done** |
+| 9 | Polish — design, copy, responsive, docs | Partial |
+| 10 | Deployment — Vercel (frontend) + Render (backend) | **Ready** |
 
 ---
 
@@ -76,6 +82,22 @@ commit a key.
 
 `GET /api/health` reports which mode you are in (`live` or `cached-fallback`),
 and so does the client's Server panel.
+
+### API routes
+
+| Route | Tier | Description |
+|---|---|---|
+| `GET /api/health` | Public | Liveness probe, LLM mode |
+| `POST /api/auth/login` | Public | Establish role session |
+| `POST /api/auth/logout` | Public | End session |
+| `GET /api/auth/me` | Public | Current user (or null) |
+| `POST /api/checkin` | Auth | Submit check-in, live LLM analysis |
+| `GET /api/counsellor/cases` | Tier 1 | Prioritised case queue |
+| `GET /api/counsellor/cases/:id` | Tier 1 | Case detail + history + trend |
+| `GET /api/counsellor/alerts` | Tier 1 | Escalated cases |
+| `GET /api/admin/summary` | Tier 2 | Headline counts |
+| `GET /api/admin/trends` | Tier 2 | Band distribution, trend directions |
+| `GET /api/admin/geography` | Tier 2 | Geographic breakdown (national/state/district) |
 
 ### Demo sign-in
 
@@ -151,13 +173,35 @@ server/src/
     roles.js          Roles, data tiers, and the invariant they protect
     requireRole.js    Route guards. Every route sits behind one of these.
   config/env.js   All environment reading happens here, nowhere else.
+  data/
+    personas.js       Eight synthetic personas from spec Section 6
+  domain/
+    records.js        Record schema: case, check-in, assessment
+    distressScore.js  Composite distress score (4 components)
+    engagement.js     Engagement metrics and trend detection
+    escalation.js     Deterministic escalation rule
+    priorityWeighting.js  Priority-use-case weighting table
+    assessCase.js     Assessment pipeline: history -> scored series
+  llm/
+    prompts.js        LLM prompts and content-safety rules
+    groqClient.js     Groq API client with timeout, fallback, caching
   routes/
     auth.js           Establishes the server-side role session
+    checkin.js        Check-in submission with live LLM analysis
     counsellor.js     TIER 1 — individual-level data (guarded router-wide)
     admin.js          TIER 2 — aggregate only (guarded router-wide)
+  safety/
+    contentPatterns.js  Content-safety regex patterns
+  store/
+    memoryStore.js    In-memory store with prioritised queue
 client/src/
   styles/tokens.css   Design tokens, with the visual brief explained inline
-  App.jsx             Application shell
+  App.jsx             Application shell with navigation
+  LoginPage.jsx       Sign-in page (demo credentials)
+  CounsellorDashboard.jsx  Case queue and alerts view
+  CaseDetail.jsx      Individual case with trend chart and explainability
+  AdminDashboard.jsx  Aggregate dashboard with charts and geography drill-down
+  CheckinChat.jsx     Victim-facing chatbot interface
 ```
 
 Routers are organised **by access tier, not by feature**, so the separation is
@@ -198,6 +242,28 @@ Called out so nobody mistakes a hackathon shortcut for a design claim:
 - **`FORCE_FALLBACK_MODE=true`** in `.env` is a panic switch that skips all
   network calls and serves cached responses. Use it if the venue network is
   unusable.
+- **Voice stress analytics is not included.** Text-based sentiment analysis
+  covers the check-in channel. Voice/emotion AI is a Phase 2 addition for the
+  IVRS channel, which is currently simulated per the spec's honest scoping.
+- **Law-enforcement coordination is Phase 2.** The system routes alerts to
+  counsellors. Inter-agency notification and law-enforcement integration are
+  Phase 2 roadmap items, same framing as HRMS/NHAA live integration.
+
+---
+
+## Known accessibility gaps
+
+Flagged for post-hackathon hardening. None block the demo but all should be
+resolved before any production deployment.
+
+| Gap | Location | Impact | Fix |
+|---|---|---|---|
+| **Clickable `<div>` elements** | `CounsellorDashboard` CaseCard/AlertCard, `CaseDetail` CheckInCard | Keyboard users cannot reach or activate case cards. Screen readers announce them as static text, not interactive controls. | Convert to `<button>` elements, or add `role="button"` + `tabIndex={0}` + `onKeyDown` handler for Enter/Space. |
+| **Emoji as structural icons** | `CounsellorDashboard` stage icons (🔍⚖️⏳📋✅), login role icons (🩺📊), assessment status (⚠✓🟢📋) | Platform-dependent rendering, no aria support, inconsistent across OS/browsers. | Replace with inline SVG icons from a consistent family (e.g. Lucide, Heroicons). |
+| **No `aria-busy` on loading states** | `CounsellorDashboard` loading shimmer, `AdminDashboard` loading shimmer | Screen readers do not announce that content is loading. | Add `aria-busy="true"` and `role="status"` to shimmer containers. |
+| **No `role="status"` on live assessment** | `CheckinChat` assessment summary bar | Score updates after each reply are not announced to screen readers. | Wrap the assessment bar in `<div role="status" aria-live="polite">`. |
+| **No `prefers-reduced-motion` CSS** | `tokens.css` | Users who prefer reduced motion still see all animations. | Add `@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }`. |
+| **Chat input not labelled** | `CheckinChat` text input | Screen readers announce "edit text" with no context. | Add `aria-label="Type your reply"` (or Hindi equivalent based on locale). |
 
 ---
 

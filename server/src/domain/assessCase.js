@@ -28,6 +28,7 @@
 import { engagementMetrics, sentimentTrend, surfaceUnderlyingMismatch, CHECK_IN_STATUS } from './engagement.js';
 import { compositeDistressScore, COMPONENT_WEIGHTS, BAND } from './distressScore.js';
 import { SIGNAL, SIGNAL_LABELS, evaluateEscalation, describeSignal } from './escalation.js';
+import { recommendInterventions } from './interventions.js';
 import { makeAssessment, PROVENANCE } from './records.js';
 
 /**
@@ -244,6 +245,13 @@ function assessPrefix(caseRecord, prefix, options) {
     }))
     .sort((a, b) => b.contribution - a.contribution);
 
+  // Intervention recommendations — deterministic lookup, not LLM-generated.
+  const interventions = recommendInterventions({
+    band,
+    priorityTags: caseRecord?.priorityTags ?? [],
+    signals,
+  });
+
   return makeAssessment({
     caseId: caseRecord?.caseId ?? null,
     checkInId: latest.id,
@@ -255,6 +263,7 @@ function assessPrefix(caseRecord, prefix, options) {
     trend: { ...trend, points: readings.length },
     mismatch,
     escalation,
+    interventions,
     explanation: {
       headline: `${BAND_LABELS[band]} support signal at this check-in. Largest contributor: ${drivers[0].label.toLowerCase()}.`,
       drivers,

@@ -57,7 +57,7 @@ export function createStore(options = {}) {
     return entry;
   }
 
-  // Seed the six personas. buildPersonaCases already returns finished records, but
+  // Seed the eight personas. buildPersonaCases already returns finished records, but
   // the raw declarations are what this store needs to stay appendable, so the
   // history is unwrapped back into raw form here.
   for (const { caseRecord, history } of buildPersonaCases({ now: seedClock })) {

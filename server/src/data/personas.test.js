@@ -1,5 +1,5 @@
 /**
- * Tests for the six seeded personas.
+ * Tests for the eight seeded personas.
  *
  * Two jobs here, and they are different in kind.
  *
@@ -34,6 +34,9 @@ import { assessCaseHistory, assessLatest } from '../domain/assessCase.js';
 import { BAND } from '../domain/distressScore.js';
 import { CHECK_IN_STATUS, SUSTAINED_MISMATCH_RUN } from '../domain/engagement.js';
 import { makeCase, SPEAKER } from '../domain/records.js';
+import {
+  GRAPHIC, DIAGNOSTIC_LABEL, PII, OVERCLAIM, findMatches, scanAuthoredText,
+} from '../safety/contentPatterns.js';
 
 /** A fixed clock, so every assertion about a score is deterministic. */
 const NOW = Date.parse('2026-08-26T09:00:00.000Z');
@@ -62,9 +65,9 @@ function allPersonReplies() {
 }
 
 describe('the persona set as a whole', () => {
-  test('all six personas from spec Section 6 are present', () => {
-    assert.deepEqual(PERSONA_KEYS, ['A', 'B', 'C', 'D', 'E', 'F']);
-    assert.equal(cases.length, 6);
+  test('all eight personas from spec Section 6 are present', () => {
+    assert.deepEqual(PERSONA_KEYS, ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']);
+    assert.equal(cases.length, 8);
   });
 
   test('every persona has a target declared from the spec', () => {
@@ -109,12 +112,12 @@ describe('the persona set as a whole', () => {
     const flagged = cases.filter(({ caseRecord, history }) =>
       assessLatest(caseRecord, history, { now: NOW }).escalation.triggered);
     assert.ok(flagged.length >= 2, 'no meaningful alert state to demonstrate');
-    assert.ok(flagged.length <= 4, 'nearly everything is escalated, which is the alert-fatigue failure');
+    assert.ok(flagged.length <= 5, 'nearly everything is escalated, which is the alert-fatigue failure');
   });
 });
 
 describe('spec Section 6 targets, met through the generic pipeline', () => {
-  for (const key of ['A', 'B', 'C', 'D', 'E', 'F']) {
+  for (const key of ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']) {
     const target = PERSONA_TARGETS[key];
 
     test(`${key} — ${target.specTarget}`, () => {
@@ -282,6 +285,107 @@ describe('C — the case that must not be over-flagged', () => {
   });
 });
 
+describe('G — escalation through the ordinary threshold path', () => {
+  const { caseRecord, history } = byKey.get('G');
+
+  test('escalates via the threshold path, not a hard trigger', () => {
+    const latest = assessLatest(caseRecord, history, { now: NOW });
+    const codes = latest.escalation.triggerReasons.map((r) => r.code);
+    assert.ok(codes.includes('threshold_crossed'));
+    // G must not rely on a special-case hard trigger — the point is that the
+    // same generic rule flags this case through the ordinary weighted-score path.
+    assert.ok(!codes.includes('intimidation_on_witness_case'));
+    assert.ok(!codes.includes('sustained_surface_mismatch'));
+  });
+
+  test('the sexual-assault weight is what pushes the adjusted score over the threshold', () => {
+    const latest = assessLatest(caseRecord, history, { now: NOW });
+    assert.ok(latest.escalation.priorityWeight > 1, 'sexual-assault weighting is not being applied');
+    assert.ok(latest.escalation.priorityAdjustedScore >= latest.score);
+  });
+
+  test('reads as HIGH band', () => {
+    const latest = assessLatest(caseRecord, history, { now: NOW });
+    assert.equal(latest.band, BAND.HIGH);
+  });
+
+  test('withdrawal pattern is visible in the engagement metrics', () => {
+    const latest = assessLatest(caseRecord, history, { now: NOW });
+    assert.ok(history.some((c) => c.status === CHECK_IN_STATUS.MISSED), 'G has no missed check-ins');
+    const answered = history.filter((c) => c.status === CHECK_IN_STATUS.COMPLETED);
+    assert.ok(answered.at(-1).wordCount < answered[0].wordCount,
+      'reply length did not decline');
+  });
+
+  test('the seed does not fabricate immediateReviewRequested', () => {
+    assert.ok(history.every((c) => c.immediateReviewRequested === false),
+      'the seed is flattering the model by pre-setting immediateReviewRequested');
+  });
+});
+
+describe('H — distress from financial and hardship language, not violence', () => {
+  const { caseRecord, history } = byKey.get('H');
+
+  test('reads as elevated or moderate band', () => {
+    const latest = assessLatest(caseRecord, history, { now: NOW });
+    assert.ok(
+      [BAND.MODERATE, BAND.ELEVATED].includes(latest.band),
+      `H read as ${latest.band} (score ${latest.score}); spec expects moderate or elevated`,
+    );
+  });
+
+  test('does not escalate — the score is concerning but below the hard line', () => {
+    const latest = assessLatest(caseRecord, history, { now: NOW });
+    assert.equal(latest.escalation.triggered, false);
+  });
+
+  test('the distress is carried by economic and procedural signals, not intimidation', () => {
+    const latest = assessLatest(caseRecord, history, { now: NOW });
+    const codes = latest.escalation.triggerReasons.map((r) => r.code);
+    assert.ok(!codes.includes('intimidation_on_witness_case'));
+    assert.ok(!codes.includes('sustained_surface_mismatch'));
+  });
+
+  test('at least one check-in reported financial or hardship pressure', () => {
+    const allSignals = history.flatMap((c) => [...c.signals]);
+    assert.ok(allSignals.includes('economic_pressure'),
+      'H carries no economic_pressure signal — the financial hardship is not being detected');
+  });
+
+  test('at least one check-in was missed, so engagement is not perfect', () => {
+    assert.ok(history.some((c) => c.status === CHECK_IN_STATUS.MISSED));
+  });
+});
+
+describe('G and H receive different interventions from their respective tags', () => {
+  test('G gets One Stop Centre referral from SEXUAL_ASSAULT tag', () => {
+    const { caseRecord, history } = byKey.get('G');
+    const latest = assessLatest(caseRecord, history, { now: NOW });
+    const interventionCodes = latest.interventions.map((i) => i.code);
+    assert.ok(interventionCodes.includes('one_stop_centre'),
+      `G should get One Stop Centre referral, got: ${interventionCodes.join(', ')}`);
+  });
+
+  test('H gets financial assistance from GRAVE_OFFENCE tag, not One Stop Centre', () => {
+    const { caseRecord, history } = byKey.get('H');
+    const latest = assessLatest(caseRecord, history, { now: NOW });
+    const interventionCodes = latest.interventions.map((i) => i.code);
+    assert.ok(interventionCodes.includes('financial_aid'),
+      `H should get financial assistance, got: ${interventionCodes.join(', ')}`);
+    assert.ok(!interventionCodes.includes('one_stop_centre'),
+      `H should NOT get One Stop Centre referral, got: ${interventionCodes.join(', ')}`);
+  });
+
+  test('G and H have different intervention sets', () => {
+    const gLatest = assessLatest(byKey.get('G').caseRecord, byKey.get('G').history, { now: NOW });
+    const hLatest = assessLatest(byKey.get('H').caseRecord, byKey.get('H').history, { now: NOW });
+    const gCodes = gLatest.interventions.map((i) => i.code).sort();
+    const hCodes = hLatest.interventions.map((i) => i.code).sort();
+    assert.notDeepEqual(gCodes, hCodes,
+      `G and H should have different interventions but both got: ${gCodes.join(', ')}`);
+  });
+});
+
 describe('the rule is generic, not special-cased per persona', () => {
   /**
    * The load-bearing genericity test.
@@ -384,71 +488,49 @@ describe('seed integrity', () => {
  * These scan the seed rather than trusting that it was written carefully. The
  * point is that the next person to add a persona finds out immediately.
  */
+/**
+ * CONTENT SAFETY — spec Section 12, treated as hard rules.
+ *
+ * These scan the seed rather than trusting that it was written carefully. The
+ * point is that the next person to add a persona finds out immediately.
+ *
+ * The vocabulary comes from ../safety/contentPatterns.js and is not restated here.
+ * It used to be: this file held its own copies, the model probe held another set,
+ * and they diverged — a false positive fixed in one stayed live in the other, and
+ * three of the Hindi patterns here were written /\bमारपीट\b/, which can never match
+ * because JavaScript's \b is defined against [A-Za-z0-9_]. That silently disabled
+ * the graphic-language guard over Persona A, whose history is entirely in Hindi.
+ * Importing means a fix lands once, for every caller.
+ *
+ * Seed text is scanned with the STRICT scanner. A persona's own words, a district
+ * label or an explanation template has no business containing clinical vocabulary in
+ * any framing, so nothing here is exempted for carrying a disclaimer.
+ */
 describe('content safety', () => {
-  /**
-   * Language that would describe an act rather than a situation.
-   *
-   * Written as specific word forms rather than loose stems on purpose: an earlier
-   * throwaway version of this check used /stabb?\w*​/ and flagged the word
-   * "stability", which is the kind of false positive that gets a safety test
-   * disabled instead of fixed.
-   */
-  const GRAPHIC = [
-    /\bassault(ed|ing|s)?\b/i, /\brap(e|ed|ing)\b/i, /\bstab(bed|bing|s)\b/i,
-    /\bbeat(en|ing)?\b/i, /\bkill(ed|ing|s)?\b/i, /\bmurder(ed|ing|s)?\b/i,
-    /\bblood(y|ied)?\b/i, /\bbleed(ing)?\b/i, /\bwound(ed|s)?\b/i,
-    /\binjur(y|ies|ed)\b/i, /\bburn(ed|t|ing)\b/i, /\bstrangl\w*/i,
-    /\bmutilat\w*/i, /\bcorpse\b/i, /\bweapon(s)?\b/i, /\bknife\b/i,
-    /\bdragged\b/i, /\bmolest\w*/i, /\bहत्या\b/, /\bखून\b/, /\bमारपीट\b/,
-  ];
-
-  /**
-   * Clinical framing. The system reports support signals, not conditions — it has
-   * no validation data and no clinician in the loop, so naming a condition would
-   * be a claim it cannot back. Spec Section 8.
-   */
-  const DIAGNOSTIC = [
-    /\bdepress\w*/i, /\bptsd\b/i, /\btrauma(tis|tiz)\w*/i, /\banxiety\b/i,
-    /\bdiagnos\w*/i, /\bpsychiatric\b/i, /\bmental illness\b/i, /\bdisorder(s)?\b/i,
-    /\bsuicid\w*/i, /\bself[- ]harm\b/i, /\bsymptom(s)?\b/i, /\bpatient(s)?\b/i,
-    /\bpatholog\w*/i, /\btherapy\b/i, /\bclinical\w*/i,
-  ];
-
-  /** Anything shaped like a real-world identifier. */
-  const PII = [
-    /\b\d{10,}\b/,                       // phone or Aadhaar-length digit runs
-    /\b\d{4}\s?\d{4}\s?\d{4}\b/,         // spaced Aadhaar shape
-    /[\w.+-]+@[\w-]+\.\w+/,              // email
-    /\bhttps?:\/\//i,                    // external link
-  ];
-
   test('no seed text describes an act of violence', () => {
     for (const text of allSeedText()) {
-      for (const pattern of GRAPHIC) {
-        assert.ok(!pattern.test(text), `graphic language matching ${pattern} in seed text: "${text}"`);
-      }
+      const hits = findMatches(text, GRAPHIC, 'graphic');
+      assert.deepEqual(hits, [], `graphic language ${hits[0]?.pattern} in seed text: "${text}"`);
     }
   });
 
   test('no seed text uses clinical or diagnostic language', () => {
     for (const text of allSeedText()) {
-      for (const pattern of DIAGNOSTIC) {
-        assert.ok(!pattern.test(text), `diagnostic language matching ${pattern} in seed text: "${text}"`);
-      }
+      const hits = findMatches(text, DIAGNOSTIC_LABEL, 'diagnostic-label');
+      assert.deepEqual(hits, [], `diagnostic language ${hits[0]?.pattern} in seed text: "${text}"`);
     }
   });
 
   test('no seed text contains anything shaped like real personal data', () => {
     for (const text of allSeedText()) {
-      for (const pattern of PII) {
-        assert.ok(!pattern.test(text), `possible PII matching ${pattern} in seed text: "${text}"`);
-      }
+      const hits = findMatches(text, PII, 'pii');
+      assert.deepEqual(hits, [], `possible PII ${hits[0]?.pattern} in seed text: "${text}"`);
     }
   });
 
   test('identities are pseudonyms and geography is placeholder-only', () => {
     for (const { caseRecord } of cases) {
-      assert.match(caseRecord.pseudonym, /^Complainant [A-F]$/, `${caseRecord.key} has a non-pseudonymous label`);
+      assert.match(caseRecord.pseudonym, /^Complainant [A-H]$/, `${caseRecord.key} has a non-pseudonymous label`);
       assert.match(caseRecord.district, /^Demo District \d+$/, `${caseRecord.key} names a real-looking district`);
       assert.match(caseRecord.state, /^Demo State \d+$/, `${caseRecord.key} names a real-looking state`);
       assert.match(caseRecord.caseId, /^SIH-CASE-\d{4}$/);
@@ -482,25 +564,37 @@ describe('content safety', () => {
     assert.match(joined, /\bmy (brother|daughter)\b/, 'expected relational references in the seed');
   });
 
-  test('no explanation generated for any persona uses diagnostic language', () => {
+  /**
+   * Every explanation string the pipeline produces, for every check-in of every
+   * persona — not just the latest one.
+   *
+   * The explanation templates live in this repo, so they are authored text and get
+   * the strict scan: graphic, diagnostic and PII patterns with no disclaimer
+   * exemption. Only the model probe scans disclaimer-aware, because only a model
+   * has a reason to say "this is not a diagnosis".
+   */
+  test('no explanation generated for any persona is unsafe in any framing', () => {
     for (const { caseRecord, history } of cases) {
       for (const a of assessCaseHistory(caseRecord, history, { now: NOW })) {
         const text = [a.explanation.headline, ...a.explanation.drivers.map((d) => `${d.label} ${d.detail}`),
           ...a.escalation.triggerReasons.map((r) => r.label)].join(' ');
-        for (const pattern of DIAGNOSTIC) {
-          assert.ok(!pattern.test(text), `${caseRecord.key}: explanation matched ${pattern}: "${text}"`);
-        }
+        const hits = scanAuthoredText(text);
+        assert.deepEqual(hits, [],
+          `${caseRecord.key}: explanation hit ${hits[0]?.category} ${hits[0]?.pattern}: "${text}"`);
       }
     }
   });
 
   test('no explanation claims an accuracy figure or a prediction it cannot support', () => {
-    const OVERCLAIM = [/\baccura\w*/i, /\bpredict\w*/i, /\bconfiden\w*/i, /\b\d+(\.\d+)?%\s*(accurate|reliable)/i];
+    // Overclaim is checked separately because it is not part of the strict scan: the
+    // word "confidence" is fine in a persona's own reply and not fine in a system
+    // explanation, so the two bodies of text are held to different lists.
     for (const { caseRecord, history } of cases) {
-      const a = assessLatest(caseRecord, history, { now: NOW });
-      const text = [a.explanation.headline, ...a.explanation.drivers.map((d) => d.detail)].join(' ');
-      for (const pattern of OVERCLAIM) {
-        assert.ok(!pattern.test(text), `${caseRecord.key}: explanation overclaims via ${pattern}: "${text}"`);
+      for (const a of assessCaseHistory(caseRecord, history, { now: NOW })) {
+        const text = [a.explanation.headline, ...a.explanation.drivers.map((d) => `${d.label} ${d.detail}`),
+          ...a.escalation.triggerReasons.map((r) => r.label)].join(' ');
+        const hits = findMatches(text, OVERCLAIM, 'overclaim');
+        assert.deepEqual(hits, [], `${caseRecord.key}: explanation overclaims via ${hits[0]?.pattern}: "${text}"`);
       }
     }
   });

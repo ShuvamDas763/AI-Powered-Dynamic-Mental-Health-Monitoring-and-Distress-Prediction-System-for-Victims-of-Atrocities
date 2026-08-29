@@ -5,7 +5,7 @@
  * feature, so the two-tier separation is visible at a glance:
  *
  *   /api/auth        - establishes the server-side role session
- *   /api/checkin     - victim's own check-in conversation (self-scoped)
+ *   /api/checkin     - submit check-in conversation, live LLM analysis
  *   /api/counsellor  - TIER 1, identified individual case data
  *   /api/admin       - TIER 2, aggregate data only
  *
@@ -15,8 +15,10 @@
 
 import express from 'express';
 import session from 'express-session';
+import cors from 'cors';
 import { config, describeConfig } from './config/env.js';
 import { authRouter } from './routes/auth.js';
+import { checkinRouter } from './routes/checkin.js';
 import { counsellorRouter } from './routes/counsellor.js';
 import { adminRouter } from './routes/admin.js';
 
@@ -24,8 +26,24 @@ const app = express();
 
 app.use(express.json({ limit: '256kb' }));
 
-// The Vite dev server proxies /api to this process (see client/vite.config.js),
-// so requests are same-origin and the session cookie needs no CORS handling.
+// CORS — allow the deployed frontend origin. In development the Vite proxy
+// makes requests same-origin, so this is only exercised in production.
+const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+if (allowedOrigins.length > 0) {
+  app.use(cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (curl, server-to-server)
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+  }));
+}
+
+// Trust proxy for HTTPS behind Render/Railway load balancer.
 app.set('trust proxy', 1);
 
 app.use(
@@ -37,7 +55,7 @@ app.use(
     cookie: {
       httpOnly: true, // not readable by client-side JS
       sameSite: 'lax',
-      secure: false, // local http prototype; a real deployment sets this true
+      secure: process.env.NODE_ENV === 'production', // HTTPS in production
       maxAge: 1000 * 60 * 60 * 8, // one working day
     },
   }),
@@ -53,6 +71,7 @@ app.get('/api/health', (req, res) => {
 });
 
 app.use('/api/auth', authRouter);
+app.use('/api/checkin', checkinRouter);
 
 // TIER 1 — individual-level data. Guarded inside the router.
 app.use('/api/counsellor', counsellorRouter);
