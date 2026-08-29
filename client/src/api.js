@@ -17,7 +17,7 @@ const BASE = import.meta.env.VITE_API_BASE ?? '';
  */
 export async function api(path, options = {}) {
   const response = await fetch(`${BASE}/api${path}`, {
-    credentials: 'same-origin',
+    credentials: BASE ? 'include' : 'same-origin',
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });

@@ -46,6 +46,8 @@ if (allowedOrigins.length > 0) {
 // Trust proxy for HTTPS behind Render/Railway load balancer.
 app.set('trust proxy', 1);
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 app.use(
   session({
     name: 'sih26094.sid',
@@ -54,8 +56,8 @@ app.use(
     saveUninitialized: false,
     cookie: {
       httpOnly: true, // not readable by client-side JS
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production', // HTTPS in production
+      sameSite: isProduction ? 'none' : 'lax', // 'none' required for cross-origin cookies
+      secure: isProduction, // HTTPS in production (required when sameSite is 'none')
       maxAge: 1000 * 60 * 60 * 8, // one working day
     },
   }),
