@@ -24,9 +24,10 @@ All code changes for deployment are complete:
    - **Name:** `freebuff-api`
    - **Runtime:** Node
    - **Plan:** Free
-   - **Root Directory:** `server`
+   - **Root Directory:** (leave blank — deploy from repo root)
    - **Build Command:** `npm install`
-   - **Start Command:** `node src/index.js`
+   - **Start Command:** `node server/src/index.js`
+   - **Auto Deploy:** Yes (from `main` branch)
 5. Add environment variables:
    - `NODE_ENV` = `production`
    - `GROQ_API_KEY` = your Groq API key
@@ -35,6 +36,11 @@ All code changes for deployment are complete:
    - `API_PORT` = `10000`
 6. Click **Create Web Service**
 7. Wait for deployment, note the URL (e.g., `https://freebuff-api.onrender.com`)
+
+> **Note:** This is a monorepo. The root `package.json` has a `build` script that
+> builds the client. Render will run it after `npm install` — that's fine, the client
+> build is harmless here. The server starts from `server/src/index.js` with all
+> workspace dependencies hoisted to the root `node_modules/`.
 
 ## Step 2: Deploy Frontend to Vercel
 
