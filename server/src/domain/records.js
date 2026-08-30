@@ -193,6 +193,13 @@ export function makeCheckIn(raw, options = {}) {
      * false on cases that plainly warrant attention.
      */
     immediateReviewRequested: missed ? false : input.immediateReviewRequested === true,
+    /**
+     * Lightweight consent acknowledgment. True when the person confirmed they
+     * understand this check-in helps connect them with support. Shown once on
+     * first check-in, stored for audit trail.
+     */
+    consentAcknowledged: input.consentAcknowledged === true,
+
     provenance: oneOf(input.provenance, PROVENANCE, PROVENANCE.SEED),
   });
 }

@@ -82,6 +82,9 @@ counsellorRouter.get('/cases/:caseId', (req, res) => {
     score: assessment.score,
     band: assessment.band,
     escalated: assessment.escalation.triggered,
+    // Expose channel/locale so the client can flag non-comparable segments.
+    channel: history[index]?.channel ?? null,
+    locale: history[index]?.locale ?? null,
   }));
 
   // Map the full history into a counsellor-readable format.
@@ -100,6 +103,7 @@ counsellorRouter.get('/cases/:caseId', (req, res) => {
     signalPhrases: c.signalPhrases,
     immediateReviewRequested: c.immediateReviewRequested,
     provenance: c.provenance,
+    consentAcknowledged: c.consentAcknowledged,
     // Include the turns for the counsellor to read.
     turns: c.turns.map((t) => ({ speaker: t.speaker, text: t.text })),
     // Attach the assessment for this check-in.

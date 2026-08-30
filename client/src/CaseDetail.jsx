@@ -1,13 +1,34 @@
 import { useEffect, useState } from 'react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ReferenceLine, ResponsiveContainer, Area, AreaChart,
+  ReferenceLine, ResponsiveContainer, Area, AreaChart, ReferenceDot,
 } from 'recharts';
 import { api } from './api.js';
 
 const BAND_CLASS = { low: 'band-low', moderate: 'band-moderate', elevated: 'band-elevated', high: 'band-high' };
 const STAGE_LABELS = { investigation: 'Investigation', trial_active: 'Trial (active)', trial_pending: 'Trial (pending)', chargesheet_filed: 'Chargesheet filed', post_compensation: 'Post-compensation' };
 const BAND_COLORS = { low: '#4a7c59', moderate: '#a0722e', elevated: '#c45d3a', high: '#8b2e23' };
+
+/**
+ * Custom dot that flags non-comparable segments. When channel or locale changed
+ * between consecutive check-ins, the dot shows a warning indicator so the
+ * counsellor knows the score change may reflect a different measurement context,
+ * not a real change in the person's state.
+ */
+const ComparabilityDot = (props) => {
+  const { cx, cy, payload } = props;
+  if (payload?.comparable) {
+    return (
+      <circle cx={cx} cy={cy} r={5} fill="#1a3a42" stroke="#fff" strokeWidth={2} />
+    );
+  }
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={6} fill="#fff" stroke="#a0722e" strokeWidth={2} strokeDasharray="3 2" />
+      <text x={cx} y={cy - 12} textAnchor="middle" fontSize={10} fill="#a0722e" fontWeight={700}>≠</text>
+    </g>
+  );
+};
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
@@ -60,10 +81,18 @@ export default function CaseDetail({ caseId, onBack }) {
   const drivers = explanation.drivers ?? [];
   const interventions = latestAssessment?.interventions ?? [];
 
-  const chartData = trendData.map((p) => ({
-    ...p,
-    label: `#${p.checkInNumber}`,
-  }));
+  // Flag segments where channel or locale changed — not directly comparable.
+  const chartData = trendData.map((p, i) => {
+    const prev = i > 0 ? trendData[i - 1] : null;
+    const comparable = !prev || (p.channel === prev.channel && p.locale === prev.locale);
+    return {
+      ...p,
+      label: `#${p.checkInNumber}`,
+      comparable,
+    };
+  });
+
+  const nonComparableCount = chartData.filter((p) => !p.comparable).length;
 
   const completedCount = checkIns.filter((c) => c.status === 'completed').length;
   const missedCount = checkIns.filter((c) => c.status === 'missed').length;
@@ -169,7 +198,7 @@ export default function CaseDetail({ caseId, onBack }) {
                 stroke="#1a3a42"
                 strokeWidth={3}
                 fill="url(#scoreGradient)"
-                dot={{ r: 5, fill: '#1a3a42', stroke: '#fff', strokeWidth: 2 }}
+                dot={<ComparabilityDot />}
                 activeDot={{ r: 7, stroke: '#1a3a42', strokeWidth: 2, fill: '#fff' }}
               />
             </AreaChart>
@@ -187,6 +216,24 @@ export default function CaseDetail({ caseId, onBack }) {
               </span>
             ))}
           </div>
+          {nonComparableCount > 0 && (
+            <div style={{
+              marginTop: '0.65rem',
+              padding: '0.5rem 0.75rem',
+              background: 'var(--warm-pale)',
+              borderRadius: 'var(--radius-sm)',
+              fontSize: '0.78rem',
+              color: 'var(--ink-soft)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+            }}>
+              <span style={{ color: '#a0722e', fontWeight: 700 }}>≠</span>
+              <span>
+                {nonComparableCount} segment{nonComparableCount > 1 ? 's' : ''} used a different channel or language and are marked as not directly comparable.
+              </span>
+            </div>
+          )}
         </div>
       )}
 
@@ -408,10 +455,11 @@ function CheckInCard({ checkIn: c }) {
             </div>
           )}
 
-          <div style={{ fontSize: '0.78rem', color: 'var(--ink-muted)', display: 'flex', gap: '0.75rem' }}>
+          <div style={{ fontSize: '0.78rem', color: 'var(--ink-muted)', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
             <span>{c.wordCount} words</span>
             <span>{c.responseLatencyHours != null ? `${c.responseLatencyHours}h latency` : 'no reply'}</span>
             {c.surfaceSentimentCarriedForward && <span style={{ color: 'var(--risk-moderate)' }}>(carried forward)</span>}
+            {c.consentAcknowledged && <span style={{ color: 'var(--risk-low)' }}>✓ consent</span>}
           </div>
 
           {assessment?.explanation?.drivers && (

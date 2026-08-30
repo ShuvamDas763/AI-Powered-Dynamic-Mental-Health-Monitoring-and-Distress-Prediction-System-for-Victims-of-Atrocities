@@ -19,6 +19,8 @@ const CHANNELS = [
   { id: 'ivrs', label: 'IVRS' },
 ];
 
+const CONSENT_KEY = 'freebuff_consent';
+
 const INITIAL_PROMPTS_EN = 'How have things been since we last checked in?';
 const INITIAL_PROMPTS_HI = 'पिछली बार बात होने के बाद से चीज़ें कैसी रहीं?';
 
@@ -33,7 +35,17 @@ export default function CheckinChat({ user }) {
   const [busy, setBusy] = useState(false);
   const [channel, setChannel] = useState('app');
   const [lastAssessment, setLastAssessment] = useState(null);
+  const [consentGiven, setConsentGiven] = useState(false);
   const messagesEnd = useRef(null);
+
+  // Re-check consent from localStorage when the selected case changes.
+  useEffect(() => {
+    if (!selectedCase) return;
+    try {
+      const stored = JSON.parse(localStorage.getItem(CONSENT_KEY) ?? '{}');
+      setConsentGiven(stored[selectedCase] === true);
+    } catch { setConsentGiven(false); }
+  }, [selectedCase]);
 
   // Victims can only see their own case.
   const availableCases = user?.caseId
@@ -74,6 +86,7 @@ export default function CheckinChat({ user }) {
           turns: newMessages,
           locale,
           channel,
+          consentAcknowledged: consentGiven,
         }),
       });
 
@@ -281,6 +294,41 @@ export default function CheckinChat({ user }) {
               {lastAssessment.provenance?.source === 'live' ? '🟢 Live' : '📋 Cached'}
             </span>
           </div>
+        )}
+
+        {/* Consent acknowledgment — first check-in only, stored per case */}
+        {!consentGiven && (
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.6rem 0.85rem',
+              margin: '0.35rem 0',
+              background: 'var(--warm-pale)',
+              borderRadius: 'var(--radius)',
+              fontSize: '0.82rem',
+              color: 'var(--ink-soft)',
+              cursor: 'pointer',
+              border: '1px solid rgba(184, 134, 11, 0.12)',
+              animation: 'fadeIn 0.3s var(--ease-out)',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={consentGiven}
+              onChange={() => {
+                setConsentGiven(true);
+                try {
+                  const stored = JSON.parse(localStorage.getItem(CONSENT_KEY) ?? '{}');
+                  stored[selectedCase] = true;
+                  localStorage.setItem(CONSENT_KEY, JSON.stringify(stored));
+                } catch { /* ignore */ }
+              }}
+              style={{ accentColor: 'var(--accent)', width: 16, height: 16 }}
+            />
+            I understand this check-in helps connect me with support.
+          </label>
         )}
 
         {/* Voice pattern — app channel only, supplementary, never scored */}

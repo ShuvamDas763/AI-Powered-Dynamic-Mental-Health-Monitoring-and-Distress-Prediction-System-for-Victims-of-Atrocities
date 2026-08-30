@@ -41,7 +41,7 @@ checkinRouter.use(requireVictim);
  *   channel: string (optional) — 'app', 'web', 'sms', 'ivrs'
  */
 checkinRouter.post('/', async (req, res) => {
-  const { caseId, turns, locale, channel } = req.body ?? {};
+  const { caseId, turns, locale, channel, consentAcknowledged } = req.body ?? {};
 
   if (!caseId || !Array.isArray(turns) || turns.length === 0) {
     return res.status(400).json({
@@ -77,6 +77,7 @@ checkinRouter.post('/', async (req, res) => {
     signalPhrases: analysis.signalPhrases,
     immediateReviewRequested: false,
     provenance: analysis.provenance.source,
+    consentAcknowledged: consentAcknowledged === true,
   });
 
   // Generate a conversational follow-up grounded in the person's last reply.
