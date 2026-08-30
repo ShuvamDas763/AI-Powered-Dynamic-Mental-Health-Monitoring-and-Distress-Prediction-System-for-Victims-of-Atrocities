@@ -58,7 +58,7 @@ export default function App() {
 
   // Role-based default view.
   const defaultPage =
-    user.role === 'counsellor' ? 'counsellor' : user.role === 'admin' ? 'admin' : 'home';
+    user.role === 'counsellor' ? 'counsellor' : user.role === 'admin' ? 'admin' : 'checkin';
 
   const currentPage = view.page === 'home' ? defaultPage : view.page;
 
@@ -68,7 +68,7 @@ export default function App() {
         <span className="nav-brand">Well-being Monitor</span>
 
         <div className="nav-links">
-          {(user.role === 'counsellor' || user.role === 'admin') && (
+          {user.role === 'counsellor' && (
             <>
               <button
                 className={currentPage === 'counsellor' ? 'active' : ''}
@@ -92,12 +92,14 @@ export default function App() {
               Admin
             </button>
           )}
-          <button
-            className={currentPage === 'checkin' ? 'active' : ''}
-            onClick={() => navigate('checkin')}
-          >
-            Check-in
-          </button>
+          {user.role === 'victim' && (
+            <button
+              className={currentPage === 'checkin' ? 'active' : ''}
+              onClick={() => navigate('checkin')}
+            >
+              Check-in
+            </button>
+          )}
         </div>
 
         <div className="nav-user">
@@ -122,7 +124,7 @@ export default function App() {
           />
         )}
         {currentPage === 'admin' && user.role === 'admin' && <AdminDashboard />}
-        {currentPage === 'checkin' && <CheckinChat />}
+        {currentPage === 'checkin' && user.role === 'victim' && <CheckinChat user={user} />}
       </main>
     </div>
   );

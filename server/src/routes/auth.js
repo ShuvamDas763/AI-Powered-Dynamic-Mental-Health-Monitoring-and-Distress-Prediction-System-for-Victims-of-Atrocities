@@ -27,6 +27,8 @@ function publicUser(user) {
     // Exposed so the UI can label which tier it is showing. It is a description
     // of what the server already decided, never an input to that decision.
     dataTier: ROLE_DATA_TIER[user.role],
+    // Victims need to know which case is theirs.
+    ...(user.caseId ? { caseId: user.caseId } : {}),
   };
 }
 
@@ -52,6 +54,7 @@ authRouter.post('/login', (req, res) => {
       role: account.role,
       displayName: account.displayName,
       scope: account.scope,
+      ...(account.caseId ? { caseId: account.caseId } : {}),
     };
     res.json({ user: publicUser(req.session.user) });
   });

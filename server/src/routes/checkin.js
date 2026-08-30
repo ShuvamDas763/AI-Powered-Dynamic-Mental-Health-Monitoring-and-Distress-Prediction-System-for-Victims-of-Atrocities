@@ -18,17 +18,18 @@
  */
 
 import { Router } from 'express';
-import { requireAuth, currentUser } from '../access/requireRole.js';
-import { ROLES } from '../access/roles.js';
+import { requireVictim } from '../access/requireRole.js';
 import { store } from '../store/memoryStore.js';
 import { analyseCheckIn, generateFollowUp } from '../llm/groqClient.js';
 import { SPEAKER } from '../domain/records.js';
 
 export const checkinRouter = Router();
 
-// Any authenticated role can submit a check-in in the demo. In production,
-// only the victim (or a counsellor acting on their behalf) would be permitted.
-checkinRouter.use(requireAuth);
+// Only the victim role may submit check-ins. Counsellors and admins READ
+// case data through their own tiered routes; they never write check-in
+// entries on a victim's behalf. This enforces the two-tier model in both
+// directions: reads AND writes.
+checkinRouter.use(requireVictim);
 
 /**
  * Submit a check-in conversation for a specific case.
@@ -52,6 +53,12 @@ checkinRouter.post('/', async (req, res) => {
   const caseRecord = store.getCase(caseId);
   if (!caseRecord) {
     return res.status(404).json({ error: 'Case not found.' });
+  }
+
+  // Self-scoping: the victim can only submit check-ins for their own case.
+  // req.victimUsername is set by requireVictim above.
+  if (!store.isOwnedBy(caseId, req.victimUsername)) {
+    return res.status(403).json({ error: 'You can only submit check-ins for your own case.' });
   }
 
   // Run the LLM analysis on the conversation.

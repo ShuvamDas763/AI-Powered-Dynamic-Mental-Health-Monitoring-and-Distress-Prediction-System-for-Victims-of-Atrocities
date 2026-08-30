@@ -247,6 +247,8 @@ export function makeCase(raw) {
     key: input.key ?? null,
     caseId: input.caseId ?? null,
     pseudonym: input.pseudonym ?? 'Unnamed case',
+    /** The session username that owns this case. Enables self-scoping in requireVictim. */
+    victimUsername: input.victimUsername ?? null,
     /** Coarse geography only — enough for aggregate reporting, no finer. */
     district: input.district ?? null,
     state: input.state ?? null,

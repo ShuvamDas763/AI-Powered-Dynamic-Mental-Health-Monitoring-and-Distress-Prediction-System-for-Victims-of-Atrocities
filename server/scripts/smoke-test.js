@@ -61,7 +61,7 @@ async function run() {
 
   // Counsellor cases
   const cases = await request('GET', '/api/counsellor/cases', { cookie: cCookie });
-  check('Counsellor gets cases', cases.status === 200 && cases.body.cases?.length === 6);
+  check('Counsellor gets cases', cases.status === 200 && cases.body.cases?.length === 8);
   check('Cases are ranked', cases.body.cases[0]?.assessment?.escalated === true);
 
   // Counsellor case detail
@@ -84,7 +84,7 @@ async function run() {
 
   // Admin summary
   const summary = await request('GET', '/api/admin/summary', { cookie: aCookie });
-  check('Admin summary returned', summary.status === 200 && summary.body.total === 6);
+  check('Admin summary returned', summary.status === 200 && summary.body.total === 8 && typeof summary.body.escalatedCount !== 'undefined');
 
   // Admin trends
   const trends = await request('GET', '/api/admin/trends', { cookie: aCookie });

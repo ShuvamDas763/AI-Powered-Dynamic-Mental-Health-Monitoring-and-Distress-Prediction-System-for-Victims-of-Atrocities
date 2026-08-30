@@ -20,6 +20,88 @@ export default function LoginPage({ onSignIn, busy }) {
       {/* Sign-in Cards */}
       <main style={{ maxWidth: '48rem', margin: '-1rem auto 3rem', padding: '0 2rem' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+          {/* Victim / Complainant Card */}
+          <div className="card card-elevated animate-in animate-in-delay-1" style={{ cursor: 'pointer' }} onClick={() => !busy && onSignIn('victim')}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div style={{
+                width: 48,
+                height: 48,
+                borderRadius: 'var(--radius)',
+                background: 'var(--accent)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.4rem',
+                boxShadow: 'var(--shadow-md)',
+              }}>
+                💬
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.05rem' }}>Complainant A</h3>
+                <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--ink-muted)' }}>
+                  Hindi · Well-being Check-in
+                </p>
+              </div>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--ink-soft)', lineHeight: 1.6 }}>
+              Submit regular well-being check-ins. Your counsellor monitors your
+              progress and intervenes when support signals are detected.
+            </p>
+            <div style={{
+              marginTop: '1.25rem',
+              padding: '0.65rem',
+              background: 'var(--surface-sunken)',
+              borderRadius: 'var(--radius-sm)',
+              textAlign: 'center',
+              fontSize: '0.82rem',
+              color: 'var(--ink-muted)',
+              fontWeight: 500,
+            }}>
+              Sign in with demo credentials →
+            </div>
+          </div>
+
+          {/* English Victim Card */}
+          <div className="card card-elevated animate-in animate-in-delay-1" style={{ cursor: 'pointer' }} onClick={() => !busy && onSignIn('case-c')}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div style={{
+                width: 48,
+                height: 48,
+                borderRadius: 'var(--radius)',
+                background: 'var(--accent)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.4rem',
+                boxShadow: 'var(--shadow-md)',
+              }}>
+                💬
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.05rem' }}>Complainant C</h3>
+                <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--ink-muted)' }}>
+                  English · Well-being Check-in
+                </p>
+              </div>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--ink-soft)', lineHeight: 1.6 }}>
+              Compensation disbursed. Engagement steady. Reported improvement
+              over recent months. Test the English check-in flow.
+            </p>
+            <div style={{
+              marginTop: '1.25rem',
+              padding: '0.65rem',
+              background: 'var(--surface-sunken)',
+              borderRadius: 'var(--radius-sm)',
+              textAlign: 'center',
+              fontSize: '0.82rem',
+              color: 'var(--ink-muted)',
+              fontWeight: 500,
+            }}>
+              Sign in with demo credentials →
+            </div>
+          </div>
+
           {/* Welfare Officer Card */}
           <div className="card card-elevated animate-in animate-in-delay-1" style={{ cursor: 'pointer' }} onClick={() => !busy && onSignIn('counsellor')}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>

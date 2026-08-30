@@ -118,6 +118,22 @@ export function isKnownRole(role) {
  */
 export const DEMO_ACCOUNTS = Object.freeze([
   Object.freeze({
+    username: 'victim',
+    passcode: 'demo',
+    role: ROLES.VICTIM,
+    displayName: 'Complainant A (Hindi)',
+    scope: null,
+    caseId: 'SIH-CASE-0001',
+  }),
+  Object.freeze({
+    username: 'case-c',
+    passcode: 'demo',
+    role: ROLES.VICTIM,
+    displayName: 'Complainant C (English)',
+    scope: null,
+    caseId: 'SIH-CASE-0003',
+  }),
+  Object.freeze({
     username: 'counsellor',
     passcode: 'demo',
     role: ROLES.COUNSELLOR,

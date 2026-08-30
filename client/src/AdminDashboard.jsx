@@ -94,6 +94,23 @@ export default function AdminDashboard() {
             Anonymised aggregate data across all registered cases.
             Individual case information is never visible at this level.
           </p>
+          {summary && summary.alertCount > 0 && (
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              padding: '0.35rem 0.85rem',
+              background: 'rgba(184, 134, 11, 0.18)',
+              border: '1px solid rgba(212, 168, 67, 0.35)',
+              borderRadius: 'var(--radius-full)',
+              marginTop: '1rem',
+            }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#d4a843', flexShrink: 0 }} />
+              <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#fdf6e3' }}>
+                {summary.alertCount} new high-risk case{summary.alertCount === 1 ? '' : 's'} this week
+              </span>
+            </div>
+          )}
         </div>
       </section>
 

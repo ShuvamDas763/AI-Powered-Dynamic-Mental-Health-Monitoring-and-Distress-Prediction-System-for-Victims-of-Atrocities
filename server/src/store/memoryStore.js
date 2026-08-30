@@ -97,6 +97,12 @@ export function createStore(options = {}) {
       return entry(caseId)?.caseRecord ?? null;
     },
 
+    /** True when the case belongs to the given victim username. */
+    isOwnedBy(caseId, username) {
+      const e = entry(caseId);
+      return e !== null && e.caseRecord.victimUsername === username;
+    },
+
     /** Full check-in history for one case, oldest first. */
     getHistory(caseId) {
       return entry(caseId)?.history ?? [];

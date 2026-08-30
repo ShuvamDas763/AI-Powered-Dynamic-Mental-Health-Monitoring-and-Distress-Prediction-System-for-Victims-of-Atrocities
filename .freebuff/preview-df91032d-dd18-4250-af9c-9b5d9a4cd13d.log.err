@@ -1,0 +1,2 @@
+npm notice run sih26094-distress-monitor@0.1.0 dev
+npm notice run concurrently -n server,client -c blue,magenta "npm:dev:server" "npm:dev:client"

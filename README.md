@@ -91,7 +91,7 @@ and so does the client's Server panel.
 | `POST /api/auth/login` | Public | Establish role session |
 | `POST /api/auth/logout` | Public | End session |
 | `GET /api/auth/me` | Public | Current user (or null) |
-| `POST /api/checkin` | Auth | Submit check-in, live LLM analysis |
+| `POST /api/checkin` | Victim only (self-scoped) | Submit check-in, live LLM analysis |
 | `GET /api/counsellor/cases` | Tier 1 | Prioritised case queue |
 | `GET /api/counsellor/cases/:id` | Tier 1 | Case detail + history + trend |
 | `GET /api/counsellor/alerts` | Tier 1 | Escalated cases |
@@ -103,6 +103,7 @@ and so does the client's Server panel.
 
 | Username | Passcode | Role |
 |---|---|---|
+| `victim` | `demo` | Complainant — own case only (self-scoped check-ins) |
 | `counsellor` | `demo` | Welfare officer — individual case access |
 | `admin` | `demo` | Administrator — aggregate data only |
 

@@ -84,7 +84,21 @@ export function requireIdentifiedDataAccess(req, res, next) {
   next();
 }
 
-/** Guard for a victim's own self-scoped routes. */
+/**
+ * Guard for a victim's own self-scoped routes.
+ *
+ * Enforces two things:
+ *   1. The session must hold the VICTIM role.
+ *   2. The victim's username is attached to `req.victimUsername` so downstream
+ *      handlers can verify case ownership without re-reading the session.
+ */
 export function requireVictim(req, res, next) {
-  return requireRole(ROLES.VICTIM)(req, res, next);
+  const user = currentUser(req);
+  if (!user) return deny(res, 401, 'Not signed in.');
+  if (user.role !== ROLES.VICTIM) {
+    return deny(res, 403, 'This view is not available to your role.');
+  }
+  // Attach the victim's identity so the route can verify case ownership.
+  req.victimUsername = user.username;
+  next();
 }

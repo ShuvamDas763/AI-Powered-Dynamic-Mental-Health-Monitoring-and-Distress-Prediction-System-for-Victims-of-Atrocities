@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { api } from './api.js';
+import VoicePatternIndicator from './VoicePatternIndicator.jsx';
 
 const CASES = [
   { caseId: 'SIH-CASE-0001', label: 'Complainant A', desc: 'Hindi · Investigation · Rising distress', locale: 'hi' },
@@ -24,7 +25,7 @@ const INITIAL_PROMPTS_HI = 'पिछली बार बात होने क
 const FALLBACK_FOLLOW_UP_EN = 'Thank you for sharing that. Is there anything else you would like to talk about?';
 const FALLBACK_FOLLOW_UP_HI = 'आपने जो बताया उसके लिए धन्यवाद। क्या और कुछ है जो आप बताना चाहेंगे?';
 
-export default function CheckinChat() {
+export default function CheckinChat({ user }) {
   const [selectedCase, setSelectedCase] = useState(null);
   const [locale, setLocale] = useState('en');
   const [messages, setMessages] = useState([]);
@@ -33,6 +34,11 @@ export default function CheckinChat() {
   const [channel, setChannel] = useState('app');
   const [lastAssessment, setLastAssessment] = useState(null);
   const messagesEnd = useRef(null);
+
+  // Victims can only see their own case.
+  const availableCases = user?.caseId
+    ? CASES.filter((c) => c.caseId === user.caseId)
+    : [];
 
   useEffect(() => {
     messagesEnd.current?.scrollIntoView({ behavior: 'smooth' });
@@ -111,10 +117,10 @@ export default function CheckinChat() {
         <div className="card card-elevated animate-in animate-in-delay-1" style={{ maxWidth: '48rem' }}>
           <h2 style={{ fontSize: '1.05rem', margin: '0 0 0.5rem' }}>Select a case</h2>
           <p style={{ color: 'var(--ink-soft)', margin: '0 0 1.25rem', fontSize: '0.9rem' }}>
-            In production this would be the victim's own session. For the demo, pick any case.
+            Submit your well-being check-in below.
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.75rem' }}>
-            {CASES.map((c, i) => (
+            {availableCases.map((c, i) => (
               <button
                 key={c.caseId}
                 className="card"
@@ -276,6 +282,9 @@ export default function CheckinChat() {
             </span>
           </div>
         )}
+
+        {/* Voice pattern — app channel only, supplementary, never scored */}
+        <VoicePatternIndicator caseId={selectedCase} enabled={channel === 'app'} />
 
         {/* Channel selector */}
         <div style={{ display: 'flex', gap: '0.3rem', padding: '0.5rem 0', borderTop: '1px solid var(--line-faint)' }}>
