@@ -193,6 +193,16 @@ export function makeCheckIn(raw, options = {}) {
      * false on cases that plainly warrant attention.
      */
     immediateReviewRequested: missed ? false : input.immediateReviewRequested === true,
+
+    /**
+     * Set when the pattern-based crisis detection layer fires on explicit
+     * self-harm/suicide language. Runs independently of the LLM scoring
+     * pipeline — must work in cached-fallback mode. When true, the assessment
+     * is forced to URGENT/HIGH and the counsellor is alerted immediately.
+     * Carries the detection metadata for explainability.
+     */
+    crisisDetected: missed ? false : input.crisisDetected === true,
+    crisisMetadata: missed ? null : (input.crisisMetadata ?? null),
     /**
      * Lightweight consent acknowledgment. True when the person confirmed they
      * understand this check-in helps connect them with support. Shown once on

@@ -94,6 +94,7 @@ export const TRIGGER = Object.freeze({
   SUSTAINED_SURFACE_MISMATCH: 'sustained_surface_mismatch',
   HOPELESSNESS_WITH_DISENGAGEMENT: 'hopelessness_with_disengagement',
   THRESHOLD_CROSSED: 'threshold_crossed',
+  CRISIS_DETECTED: 'crisis_detected',
 });
 
 /**
@@ -109,6 +110,7 @@ const TRIGGER_LABELS = Object.freeze({
   [TRIGGER.SUSTAINED_SURFACE_MISMATCH]: 'Reassuring replies alongside falling participation',
   [TRIGGER.HOPELESSNESS_WITH_DISENGAGEMENT]: 'Loss of hope alongside withdrawal from contact',
   [TRIGGER.THRESHOLD_CROSSED]: 'Priority-adjusted score crossed the review threshold',
+  [TRIGGER.CRISIS_DETECTED]: 'Explicit self-harm/suicide language detected — immediate follow-up required',
 });
 
 const asArray = (v) => (Array.isArray(v) ? v : []);
@@ -157,7 +159,12 @@ export function evaluateEscalation(input) {
 
   // Route 2: named hard conditions, each independent of the score.
   const has = (signal) => signals.includes(signal);
+  const crisisDetected = raw.crisisDetected === true;
   const firings = [
+    // Crisis detection: explicit self-harm/suicide language detected.
+    // This is the highest-priority trigger — fires regardless of score.
+    crisisDetected && TRIGGER.CRISIS_DETECTED,
+
     // The analysis layer explicitly asked for a person to look now.
     immediateReviewRequested && TRIGGER.IMMEDIATE_REVIEW_REQUESTED,
 

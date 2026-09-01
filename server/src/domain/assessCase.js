@@ -219,6 +219,7 @@ function assessPrefix(caseRecord, prefix, options) {
     signals,
     mismatchRun: mismatch.run,
     llmImmediateReview: latest.immediateReviewRequested === true,
+    crisisDetected: latest.crisisDetected === true,
   });
 
   const details = {

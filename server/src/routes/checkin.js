@@ -22,6 +22,8 @@ import { requireVictim } from '../access/requireRole.js';
 import { store } from '../store/memoryStore.js';
 import { analyseCheckIn, generateFollowUp } from '../llm/groqClient.js';
 import { SPEAKER } from '../domain/records.js';
+import { detectCrisisInCheckIn } from '../safety/crisisDetection.js';
+import { getCrisisResponse } from '../safety/crisisResponse.js';
 
 export const checkinRouter = Router();
 
@@ -61,10 +63,16 @@ checkinRouter.post('/', async (req, res) => {
     return res.status(403).json({ error: 'You can only submit check-ins for your own case.' });
   }
 
+  // ── CRISIS DETECTION (independent of LLM) ──────────────────────────────
+  // Runs BEFORE any model call, including cached-fallback. This is the one
+  // feature where a silent failure is unacceptable — the pattern check must
+  // fire even when the Groq API is unreachable.
+  const crisisResult = detectCrisisInCheckIn(turns);
+
   // Run the LLM analysis on the conversation.
   const analysis = await analyseCheckIn({ turns, locale: locale ?? 'en' });
 
-  // Record the check-in with the LLM's reading.
+  // Record the check-in with the LLM's reading, plus crisis metadata if detected.
   const assessment = store.appendCheckIn(caseId, {
     turns: turns.map((t) => ({
       speaker: t.speaker === SPEAKER.SYSTEM ? SPEAKER.SYSTEM : SPEAKER.PERSON,
@@ -72,16 +80,40 @@ checkinRouter.post('/', async (req, res) => {
     })),
     locale: locale ?? 'en',
     channel: channel ?? 'app',
-    surfaceSentiment: analysis.surfaceSentiment,
+    surfaceSentiment: crisisResult.triggered ? 95 : analysis.surfaceSentiment,
     signals: analysis.signals,
     signalPhrases: analysis.signalPhrases,
-    immediateReviewRequested: false,
+    immediateReviewRequested: crisisResult.triggered ? true : false,
     provenance: analysis.provenance.source,
     consentAcknowledged: consentAcknowledged === true,
+    crisisDetected: crisisResult.triggered,
+    crisisMetadata: crisisResult.triggered ? {
+      category: crisisResult.category,
+      categoryLabel: crisisResult.categoryLabel,
+      urgency: crisisResult.urgency,
+      matchedText: crisisResult.matchedText,
+    } : null,
   });
 
-  // Generate a conversational follow-up grounded in the person's last reply.
-  const followUp = await generateFollowUp({ turns, locale: locale ?? 'en' });
+  // Generate a follow-up: crisis response overrides the normal conversational path.
+  let followUp;
+  let crisisResponse = null;
+
+  if (crisisResult.triggered) {
+    const response = getCrisisResponse(locale ?? 'en');
+    followUp = response.steps.join('\n\n');
+    crisisResponse = {
+      triggered: true,
+      category: crisisResult.category,
+      categoryLabel: crisisResult.categoryLabel,
+      urgency: crisisResult.urgency,
+      matchedText: crisisResult.matchedText,
+      helpline: response.helpline,
+      counsellorNote: response.counsellorNote,
+    };
+  } else {
+    followUp = await generateFollowUp({ turns, locale: locale ?? 'en' });
+  }
 
   res.json({
     ok: true,
@@ -91,6 +123,7 @@ checkinRouter.post('/', async (req, res) => {
       provenance: analysis.provenance,
     },
     followUp,
+    ...(crisisResponse && { crisisResponse }),
   });
 });
 
