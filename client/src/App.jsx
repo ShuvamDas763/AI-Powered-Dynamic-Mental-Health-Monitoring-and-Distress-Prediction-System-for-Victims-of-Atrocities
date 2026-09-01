@@ -29,11 +29,21 @@ export default function App() {
     refreshUser();
   }, [refreshUser]);
 
-  async function signIn(username) {
+  // Dev panel navigation: listen for custom events from DevPersonaSwitcher
+  useEffect(() => {
+    function handleDevNav(e) {
+      const { page, caseId } = e.detail ?? {};
+      if (page) setView({ page, ...(caseId ? { caseId } : {}) });
+    }
+    window.addEventListener('dev-navigate', handleDevNav);
+    return () => window.removeEventListener('dev-navigate', handleDevNav);
+  }, []);
+
+  async function signIn(username, passcode = 'demo') {
     setBusy(true);
     await api('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ username, passcode: 'demo' }),
+      body: JSON.stringify({ username, passcode }),
     });
     await refreshUser();
     setBusy(false);
@@ -53,7 +63,7 @@ export default function App() {
 
   // Not signed in — show login.
   if (!user) {
-    return <LoginPage onSignIn={signIn} busy={busy} />;
+    return <LoginPage onSignIn={signIn} onDevLogin={refreshUser} busy={busy} />;
   }
 
   // Role-based default view.

@@ -60,3 +60,9 @@ desktop.ini
 # Agent tooling installed locally (third-party plugin checkouts, each with its
 # own .git). Machine-local developer tooling, not part of this project.
 .agents/
+
+# Freebuff runtime logs
+.freebuff/
+
+# Temp test responses
+crisis_resp*.json

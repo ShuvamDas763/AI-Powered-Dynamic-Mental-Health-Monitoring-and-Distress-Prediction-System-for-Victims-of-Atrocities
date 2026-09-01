@@ -21,6 +21,7 @@ import { authRouter } from './routes/auth.js';
 import { checkinRouter } from './routes/checkin.js';
 import { counsellorRouter } from './routes/counsellor.js';
 import { adminRouter } from './routes/admin.js';
+import { devRouter } from './routes/dev.js';
 
 const app = express();
 
@@ -69,6 +70,7 @@ app.get('/api/health', (req, res) => {
     status: 'ok',
     llmMode: config.llm.forceFallback ? 'cached-fallback' : 'live',
     model: config.llm.model,
+    isDev: config.isDev,
   });
 });
 
@@ -80,6 +82,11 @@ app.use('/api/counsellor', counsellorRouter);
 
 // TIER 2 — aggregate data only. Guarded inside the router.
 app.use('/api/admin', adminRouter);
+
+// Dev-only — testing utilities. NOT mounted in production (structural gate).
+if (config.isDev) {
+  app.use('/api/dev', devRouter);
+}
 
 // Express 5 requires named wildcards; bare '*' throws.
 app.use('/api/*splat', (req, res) => {

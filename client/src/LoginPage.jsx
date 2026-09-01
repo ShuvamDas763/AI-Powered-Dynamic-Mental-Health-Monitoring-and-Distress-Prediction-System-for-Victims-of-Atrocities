@@ -1,4 +1,31 @@
-export default function LoginPage({ onSignIn, busy }) {
+import { useState } from 'react';
+import DevPersonaSwitcher from './DevPersonaSwitcher.jsx';
+
+export default function LoginPage({ onSignIn, onDevLogin, busy }) {
+  const [username, setUsername] = useState('');
+  const [passcode, setPasscode] = useState('');
+  const [error, setError] = useState('');
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    if (!username.trim()) {
+      setError('Please enter your username or case ID.');
+      return;
+    }
+    if (!passcode.trim()) {
+      setError('Please enter your passcode.');
+      return;
+    }
+    setError('');
+    onSignIn(username.trim(), passcode.trim());
+  }
+
+  function fillDemoCredentials(user, pass) {
+    setUsername(user);
+    setPasscode(pass);
+    setError('');
+  }
+
   return (
     <div className="app-shell">
       {/* Hero Section */}
@@ -17,52 +44,12 @@ export default function LoginPage({ onSignIn, busy }) {
         </div>
       </section>
 
-      {/* Sign-in Cards */}
+      {/* Sign-in Section */}
       <main style={{ maxWidth: '48rem', margin: '-1rem auto 3rem', padding: '0 2rem' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-          {/* Victim / Complainant Card */}
-          <div className="card card-elevated animate-in animate-in-delay-1" style={{ cursor: 'pointer' }} onClick={() => !busy && onSignIn('victim')}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-              <div style={{
-                width: 48,
-                height: 48,
-                borderRadius: 'var(--radius)',
-                background: 'var(--accent)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '1.4rem',
-                boxShadow: 'var(--shadow-md)',
-              }}>
-                💬
-              </div>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '1.05rem' }}>Complainant A</h3>
-                <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--ink-muted)' }}>
-                  Hindi · Well-being Check-in
-                </p>
-              </div>
-            </div>
-            <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--ink-soft)', lineHeight: 1.6 }}>
-              Submit regular well-being check-ins. Your counsellor monitors your
-              progress and intervenes when support signals are detected.
-            </p>
-            <div style={{
-              marginTop: '1.25rem',
-              padding: '0.65rem',
-              background: 'var(--surface-sunken)',
-              borderRadius: 'var(--radius-sm)',
-              textAlign: 'center',
-              fontSize: '0.82rem',
-              color: 'var(--ink-muted)',
-              fontWeight: 500,
-            }}>
-              Sign in with demo credentials →
-            </div>
-          </div>
 
-          {/* English Victim Card */}
-          <div className="card card-elevated animate-in animate-in-delay-1" style={{ cursor: 'pointer' }} onClick={() => !busy && onSignIn('case-c')}>
+          {/* Complainant Login Form */}
+          <div className="card card-elevated animate-in animate-in-delay-1">
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
               <div style={{
                 width: 48,
@@ -78,27 +65,135 @@ export default function LoginPage({ onSignIn, busy }) {
                 💬
               </div>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.05rem' }}>Complainant C</h3>
+                <h3 style={{ margin: 0, fontSize: '1.05rem' }}>Complainant Sign-In</h3>
                 <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--ink-muted)' }}>
-                  English · Well-being Check-in
+                  Well-being Check-in Portal
                 </p>
               </div>
             </div>
-            <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--ink-soft)', lineHeight: 1.6 }}>
-              Compensation disbursed. Engagement steady. Reported improvement
-              over recent months. Test the English check-in flow.
-            </p>
+
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div>
+                <label htmlFor="login-username" style={{ display: 'block', fontSize: '0.78rem', color: 'var(--ink-muted)', marginBottom: '0.25rem', fontWeight: 500 }}>
+                  Username or Case ID
+                </label>
+                <input
+                  id="login-username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => { setUsername(e.target.value); setError(''); }}
+                  placeholder="e.g. victim, case-c"
+                  disabled={busy}
+                  style={{
+                    width: '100%',
+                    padding: '0.55rem 0.75rem',
+                    border: '1px solid var(--ink-faint, #ccc)',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: '0.88rem',
+                    background: 'var(--surface, #fff)',
+                    color: 'var(--ink, #1a1a2e)',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="login-passcode" style={{ display: 'block', fontSize: '0.78rem', color: 'var(--ink-muted)', marginBottom: '0.25rem', fontWeight: 500 }}>
+                  Passcode
+                </label>
+                <input
+                  id="login-passcode"
+                  type="password"
+                  value={passcode}
+                  onChange={(e) => { setPasscode(e.target.value); setError(''); }}
+                  placeholder="e.g. demo"
+                  disabled={busy}
+                  style={{
+                    width: '100%',
+                    padding: '0.55rem 0.75rem',
+                    border: '1px solid var(--ink-faint, #ccc)',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: '0.88rem',
+                    background: 'var(--surface, #fff)',
+                    color: 'var(--ink, #1a1a2e)',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              {error && (
+                <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--destructive, #dc2626)' }}>
+                  {error}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={busy}
+                style={{
+                  padding: '0.65rem',
+                  background: 'var(--accent)',
+                  color: 'var(--on-accent, #fff)',
+                  border: 'none',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '0.88rem',
+                  fontWeight: 500,
+                  cursor: busy ? 'default' : 'pointer',
+                  opacity: busy ? 0.6 : 1,
+                  transition: 'opacity 0.15s',
+                }}
+              >
+                {busy ? 'Signing in…' : 'Sign in'}
+              </button>
+            </form>
+
+            {/* Demo credentials helper */}
             <div style={{
-              marginTop: '1.25rem',
+              marginTop: '1rem',
               padding: '0.65rem',
               background: 'var(--surface-sunken)',
               borderRadius: 'var(--radius-sm)',
-              textAlign: 'center',
-              fontSize: '0.82rem',
+              fontSize: '0.78rem',
               color: 'var(--ink-muted)',
-              fontWeight: 500,
+              lineHeight: 1.6,
             }}>
-              Sign in with demo credentials →
+              <div style={{ fontWeight: 500, marginBottom: '0.35rem' }}>Demo accounts:</div>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => fillDemoCredentials('victim', 'demo')}
+                  disabled={busy}
+                  style={{
+                    padding: '0.25rem 0.5rem',
+                    border: '1px solid var(--ink-faint, #ccc)',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'var(--surface, #fff)',
+                    fontSize: '0.75rem',
+                    cursor: busy ? 'default' : 'pointer',
+                    color: 'var(--ink-soft)',
+                  }}
+                >
+                  victim / demo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fillDemoCredentials('case-c', 'demo')}
+                  disabled={busy}
+                  style={{
+                    padding: '0.25rem 0.5rem',
+                    border: '1px solid var(--ink-faint, #ccc)',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'var(--surface, #fff)',
+                    fontSize: '0.75rem',
+                    cursor: busy ? 'default' : 'pointer',
+                    color: 'var(--ink-soft)',
+                  }}
+                >
+                  case-c / demo
+                </button>
+              </div>
             </div>
           </div>
 
@@ -139,7 +234,7 @@ export default function LoginPage({ onSignIn, busy }) {
               color: 'var(--ink-muted)',
               fontWeight: 500,
             }}>
-              Sign in with demo credentials →
+              Sign in as welfare officer →
             </div>
           </div>
 
@@ -180,7 +275,7 @@ export default function LoginPage({ onSignIn, busy }) {
               color: 'var(--ink-muted)',
               fontWeight: 500,
             }}>
-              Sign in with demo credentials →
+              Sign in as administrator →
             </div>
           </div>
         </div>
@@ -199,6 +294,9 @@ export default function LoginPage({ onSignIn, busy }) {
             Built for Smart India Hackathon 2026 · Problem Statement SIH26094
           </p>
         </div>
+
+        {/* Dev-only persona switcher — invisible in production */}
+        <DevPersonaSwitcher onSignIn={onSignIn} onDevLogin={onDevLogin} busy={busy} />
       </main>
     </div>
   );

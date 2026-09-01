@@ -203,6 +203,31 @@ export function createStore(options = {}) {
           };
         });
     },
+
+    /**
+     * DEV ONLY — Reset the store to its initial seed state.
+     * Clears all live check-ins and rebuilds from the persona declarations.
+     */
+    reset() {
+      cases.clear();
+      for (const { caseRecord, history } of buildPersonaCases({ now: seedClock })) {
+        const raw = history.map((c) => ({
+          daysAgo: c.daysAgo,
+          occurredAt: c.occurredAt,
+          status: c.status,
+          channel: c.channel,
+          locale: c.locale,
+          turns: c.turns.map((t) => ({ speaker: t.speaker, text: t.text })),
+          responseLatencyHours: c.responseLatencyHours,
+          surfaceSentiment: c.surfaceSentimentCarriedForward ? undefined : c.surfaceSentiment,
+          signals: [...c.signals],
+          signalPhrases: [...c.signalPhrases],
+          immediateReviewRequested: c.immediateReviewRequested,
+          provenance: c.provenance,
+        }));
+        cases.set(caseRecord.caseId, rebuild({ caseRecord, raw, history: [], series: [] }));
+      }
+    },
   };
 }
 

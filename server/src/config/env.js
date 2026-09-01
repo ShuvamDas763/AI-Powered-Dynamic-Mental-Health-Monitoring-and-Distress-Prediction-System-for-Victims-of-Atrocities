@@ -98,6 +98,13 @@ export const config = Object.freeze({
     forceFallback: boolFromEnv('FORCE_FALLBACK_MODE') || !hasRealKey,
   }),
 
+  /**
+   * Development mode flag. When false, the dev-only router (persona switcher,
+   * seed reset, synthetic check-in injection) is not mounted — making those
+   * endpoints completely unreachable in the deployed build.
+   */
+  isDev: process.env.NODE_ENV !== 'production',
+
   privacy: Object.freeze({
     /**
      * Small-cell suppression threshold for the aggregate (admin) tier.
