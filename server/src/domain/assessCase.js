@@ -30,6 +30,8 @@ import { compositeDistressScore, COMPONENT_WEIGHTS, BAND } from './distressScore
 import { SIGNAL, SIGNAL_LABELS, evaluateEscalation, describeSignal } from './escalation.js';
 import { recommendInterventions } from './interventions.js';
 import { makeAssessment, PROVENANCE } from './records.js';
+import { predictEscalation } from './prediction.js';
+import { detectEmotionsInCheckIn } from './emotions.js';
 
 /**
  * How many recent check-ins are searched for signals.
@@ -253,6 +255,17 @@ function assessPrefix(caseRecord, prefix, options) {
     signals,
   });
 
+  // Prediction: extrapolate current trajectory to estimate time to escalation.
+  const prediction = predictEscalation(
+    { score, trend: { ...trend, points: readings.length } },
+    caseRecord,
+  );
+
+  // Emotion detection: identify discrete emotions from the latest check-in.
+  // Pass the turns (not the check-in records) to the emotion detector.
+  const latestTurns = Array.isArray(latest.turns) ? latest.turns : [];
+  const emotions = detectEmotionsInCheckIn(latestTurns);
+
   return makeAssessment({
     caseId: caseRecord?.caseId ?? null,
     checkInId: latest.id,
@@ -264,6 +277,8 @@ function assessPrefix(caseRecord, prefix, options) {
     trend: { ...trend, points: readings.length },
     mismatch,
     escalation,
+    prediction,
+    emotions,
     interventions,
     explanation: {
       headline: `${BAND_LABELS[band]} support signal at this check-in. Largest contributor: ${drivers[0].label.toLowerCase()}.`,

@@ -87,7 +87,7 @@ export const config = Object.freeze({
      */
     modelModeration: process.env.GROQ_MODEL_MODERATION?.trim() || 'openai/gpt-oss-safeguard-20b',
 
-    timeoutMs: intFromEnv('LLM_TIMEOUT_MS', 8000),
+    timeoutMs: intFromEnv('LLM_TIMEOUT_MS', 15000),
 
     /**
      * True when every LLM call should skip the network and serve a

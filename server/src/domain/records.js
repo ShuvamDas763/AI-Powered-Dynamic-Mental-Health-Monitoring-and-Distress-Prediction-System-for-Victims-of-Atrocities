@@ -278,6 +278,8 @@ export function makeCase(raw) {
     preferredLocale: oneOf(input.preferredLocale, LOCALE, LOCALE.EN),
     /** One line of administrative context for the counsellor view. */
     contextNote: input.contextNote ?? '',
+    /** Next hearing date — used for court-date proximity alerts. */
+    nextHearingDate: input.nextHearingDate ?? null,
   });
 }
 
@@ -327,6 +329,17 @@ export function makeAssessment(raw, options = {}) {
     interventions: Object.freeze(
       Array.isArray(input.interventions) ? input.interventions.map((i) => Object.freeze({ ...i })) : [],
     ),
+
+    /** Discrete emotions detected from the check-in text. */
+    emotions: Object.freeze({
+      emotions: Object.freeze(
+        Array.isArray(input.emotions?.emotions) ? input.emotions.emotions.map((e) => Object.freeze({ ...e })) : [],
+      ),
+      primaryEmotion: input.emotions?.primaryEmotion ?? null,
+    }),
+
+    /** Predicted time to escalation based on current trajectory. */
+    prediction: Object.freeze({ ...(input.prediction ?? {}) }),
 
     provenance: Object.freeze({
       source: oneOf(input.provenance?.source, PROVENANCE, PROVENANCE.SEED),

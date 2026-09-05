@@ -71,6 +71,14 @@ counsellorRouter.get('/cases/:caseId', (req, res) => {
     return res.status(404).json({ error: 'Case not found.' });
   }
 
+  // Audit trail — log who viewed this case.
+  store.logAccess({
+    userId: req.session?.userId ?? 'unknown',
+    role: req.session?.role ?? 'unknown',
+    action: 'view_case',
+    caseId,
+  });
+
   const history = store.getHistory(caseId);
   const series = store.getAssessmentSeries(caseId);
   const latest = store.getLatestAssessment(caseId);
@@ -129,6 +137,34 @@ counsellorRouter.get('/cases/:caseId', (req, res) => {
     trendData,
     latest,
   });
+});
+
+/**
+ * Mark a case as reviewed — creates a notification for the victim.
+ *
+ * This is the counsellor-side of the feedback loop: when a welfare officer
+ * reviews a case, the victim sees "Your check-in was reviewed." This closes
+ * the gap where victims submit check-ins and never hear back.
+ */
+counsellorRouter.post('/cases/:caseId/review', (req, res) => {
+  const { caseId } = req.params;
+  const caseRecord = store.getCase(caseId);
+  if (!caseRecord) {
+    return res.status(404).json({ error: 'Case not found.' });
+  }
+
+  const { note } = req.body ?? {};
+  const message = note
+    ? `Your check-in was reviewed by a welfare officer. Note: ${note}`
+    : 'Your check-in has been reviewed by a welfare officer. Thank you for sharing.';
+
+  store.addNotification(caseRecord.victimUsername, {
+    caseId,
+    type: 'case_reviewed',
+    message,
+  });
+
+  res.json({ ok: true });
 });
 
 /**

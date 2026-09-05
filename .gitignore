@@ -66,3 +66,21 @@ desktop.ini
 
 # Temp test responses
 crisis_resp*.json
+cookies.txt
+
+# ---------------------------------------------------------------------------
+# Internal team documents — kept LOCAL ONLY, not published to the repo.
+# These are private pitch/interview-prep materials (speaker notes, judge
+# Q&A drilling, briefing docs, slide PDFs, captured screenshots). If you
+# re-enable one deliberately, move it out of docs/private first.
+# ---------------------------------------------------------------------------
+docs/pitch-briefing.md
+docs/pitch-briefing.pdf
+docs/speaker-notes.md
+docs/speaker-notes.pdf
+docs/HexaForge-SIH26094.pdf
+docs/screenshots/
+docs/~$*
+
+# Stray lockfile created by running npm inside the client workspace
+client/package-lock.json

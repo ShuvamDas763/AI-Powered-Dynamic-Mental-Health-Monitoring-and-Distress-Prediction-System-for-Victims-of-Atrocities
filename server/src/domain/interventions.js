@@ -165,6 +165,7 @@ const TAG_TABLE = {
     { code: ACTION.LEGAL_AID, label: 'Legal aid via NALSA Compensation Scheme', description: 'Support applying under NALSA\'s 2018 Compensation Scheme for Women Victims/Survivors of Sexual Assault.', urgency: URGENCY.THIS_WEEK },
     { code: ACTION.FINANCIAL_AID, label: 'Financial assistance — staged relief eligibility', description: 'Flag eligibility for immediate staged relief under SC/ST PoA Rules Rule 12(4) Schedule, plus possible Dr. Ambedkar National Relief top-up (up to ₹5 lakh for heinous offences).', urgency: URGENCY.THIS_WEEK },
     { code: ACTION.REHABILITATION_SUPPORT, label: 'Rehabilitation measures eligibility check', description: 'Socio-economic rehabilitation package: housing, land/house-site allotment, employment scheme, pension for dependants.', urgency: URGENCY.THIS_WEEK },
+    { code: ACTION.SAFE_HOUSING, label: 'Temporary shelter referral', description: 'Refer to One Stop Centre or approved shelter home if the person needs safe temporary accommodation away from the accused or hostile environment.', urgency: URGENCY.IMMEDIATE },
   ],
 
   /**

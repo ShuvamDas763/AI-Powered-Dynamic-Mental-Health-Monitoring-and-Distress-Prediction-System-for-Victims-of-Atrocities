@@ -100,7 +100,8 @@ checkinRouter.post('/', async (req, res) => {
   let crisisResponse = null;
 
   if (crisisResult.triggered) {
-    const response = getCrisisResponse(locale ?? 'en');
+    const effectiveLocale = locale ?? caseRecord.preferredLocale ?? 'en';
+    const response = getCrisisResponse(effectiveLocale, crisisResult.category);
     followUp = response.steps.join('\n\n');
     crisisResponse = {
       triggered: true,
@@ -112,8 +113,16 @@ checkinRouter.post('/', async (req, res) => {
       counsellorNote: response.counsellorNote,
     };
   } else {
-    followUp = await generateFollowUp({ turns, locale: locale ?? 'en' });
+    const effectiveLocale = locale ?? caseRecord.preferredLocale ?? 'en';
+    followUp = await generateFollowUp({ turns, locale: effectiveLocale });
   }
+
+  // Create a notification for the victim that their check-in was received.
+  store.addNotification(req.victimUsername, {
+    caseId,
+    type: 'checkin_received',
+    message: 'Your check-in has been received and is being reviewed.',
+  });
 
   res.json({
     ok: true,

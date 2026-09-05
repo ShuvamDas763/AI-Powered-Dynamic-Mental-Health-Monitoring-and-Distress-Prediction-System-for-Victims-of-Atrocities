@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, RadialBarChart, RadialBar, Legend,
 } from 'recharts';
 import { api } from './api.js';
+import IndiaMap from './IndiaMap.jsx';
 
 const BAND_COLORS = {
   low: '#4a7c59',
@@ -34,22 +35,35 @@ const CustomPieTooltip = ({ active, payload }) => {
 export default function AdminDashboard() {
   const [summary, setSummary] = useState(null);
   const [trends, setTrends] = useState(null);
-  const [geoScope, setGeoScope] = useState('national');
+  const [geoView, setGeoView] = useState('table');
   const [geo, setGeo] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
-  useEffect(() => {
-    setLoading(true);
+  const fetchData = useCallback(() => {
     Promise.all([api('/admin/summary'), api('/admin/trends')]).then(([s, t]) => {
       setSummary(s.body);
       setTrends(t.body);
+      setLastUpdated(new Date());
       setLoading(false);
     });
   }, []);
 
   useEffect(() => {
-    api(`/admin/geography?scope=${geoScope}`).then(({ body }) => setGeo(body));
-  }, [geoScope]);
+    setLoading(true);
+    fetchData();
+  }, [fetchData]);
+
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const interval = setInterval(fetchData, 30000);
+    return () => clearInterval(interval);
+  }, [autoRefresh, fetchData]);
+
+  useEffect(() => {
+    api('/admin/geography?scope=national').then(({ body }) => setGeo(body));
+  }, []);
 
   if (loading) {
     return (
@@ -94,23 +108,29 @@ export default function AdminDashboard() {
             Anonymised aggregate data across all registered cases.
             Individual case information is never visible at this level.
           </p>
-          {summary && summary.alertCount > 0 && (
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              padding: '0.35rem 0.85rem',
-              background: 'rgba(184, 134, 11, 0.18)',
-              border: '1px solid rgba(212, 168, 67, 0.35)',
-              borderRadius: 'var(--radius-full)',
-              marginTop: '1rem',
-            }}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#d4a843', flexShrink: 0 }} />
-              <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#fdf6e3' }}>
-                {summary.alertCount} new high-risk case{summary.alertCount === 1 ? '' : 's'} this week
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+            {summary && summary.alertCount > 0 && (
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: '0.45rem',
+                padding: '0.35rem 0.85rem', background: 'rgba(184, 134, 11, 0.18)',
+                border: '1px solid rgba(212, 168, 67, 0.35)', borderRadius: 'var(--radius-full)',
+              }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#d4a843', flexShrink: 0 }} />
+                <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#fdf6e3' }}>
+                  {summary.alertCount} new high-risk case{summary.alertCount === 1 ? '' : 's'} this week
+                </span>
+              </div>
+            )}
+            <label className="auto-refresh-toggle" style={{ color: 'rgba(255,255,255,0.7)' }}>
+              <input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} />
+              Auto-refresh (30s)
+            </label>
+            {lastUpdated && (
+              <span style={{ fontSize: '0.72rem', opacity: 0.6 }}>
+                Last updated: {lastUpdated.toLocaleTimeString()}
               </span>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </section>
 
@@ -202,56 +222,67 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Geography */}
+      {/* Geography — Interactive Map + Table */}
       <div className="card animate-in animate-in-delay-4">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <h2 style={{ fontSize: '1.05rem', margin: 0 }}>Geographic Breakdown</h2>
+          <h2 style={{ fontSize: '1.05rem', margin: 0 }}>Geographic Overview</h2>
           <div style={{ display: 'flex', gap: '0.3rem', background: 'var(--surface-sunken)', padding: '0.2rem', borderRadius: 'var(--radius-sm)' }}>
-            {['national', 'state', 'district'].map((scope) => (
+            {['map', 'table'].map((view) => (
               <button
-                key={scope}
-                className={`btn btn-sm ${geoScope === scope ? '' : 'btn-ghost'}`}
+                key={view}
+                className={`btn btn-sm ${geoView === view ? '' : 'btn-ghost'}`}
                 style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem' }}
-                onClick={() => setGeoScope(scope)}
+                onClick={() => setGeoView(view)}
               >
-                {scope.charAt(0).toUpperCase() + scope.slice(1)}
+                {view === 'map' ? 'Map' : 'Table'}
               </button>
             ))}
           </div>
         </div>
 
-        {geo && geo.groups && geo.groups.length > 0 ? (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Region</th>
-                  <th>Cases</th>
-                  <th style={{ color: 'var(--risk-low)' }}>Low</th>
-                  <th style={{ color: 'var(--risk-moderate)' }}>Moderate</th>
-                  <th style={{ color: 'var(--risk-elevated)' }}>Elevated</th>
-                  <th style={{ color: 'var(--risk-high)' }}>High</th>
-                  <th>Alerts</th>
-                  <th>Rising</th>
-                </tr>
-              </thead>
-              <tbody>
-                {geo.groups.map((g) => (
-                  <tr key={g.name}>
-                    <td><strong>{g.name}</strong></td>
-                    <td>{g.total}</td>
-                    {Object.keys(BAND_COLORS).map((band) => (
-                      <td key={band}>{g.bandCounts?.[band] ?? 0}</td>
-                    ))}
-                    <td>{g.escalated}</td>
-                    <td>{g.rising}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        {geoView === 'map' ? (
+          <IndiaMap
+            stateData={(geo?.groups ?? []).map((g) => ({
+              name: g.name,
+              total: g.total,
+              avgScore: g.avgScore ?? null,
+              escalated: g.escalated,
+            }))}
+          />
         ) : (
-          <p style={{ color: 'var(--ink-muted)', textAlign: 'center', padding: '2rem' }}>No geographic data at this scope.</p>
+          geo && geo.groups && geo.groups.length > 0 ? (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Region</th>
+                    <th>Cases</th>
+                    <th style={{ color: 'var(--risk-low)' }}>Low</th>
+                    <th style={{ color: 'var(--risk-moderate)' }}>Moderate</th>
+                    <th style={{ color: 'var(--risk-elevated)' }}>Elevated</th>
+                    <th style={{ color: 'var(--risk-high)' }}>High</th>
+                    <th>Alerts</th>
+                    <th>Rising</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {geo.groups.map((g) => (
+                    <tr key={g.name}>
+                      <td><strong>{g.name}</strong></td>
+                      <td>{g.total}</td>
+                      {Object.keys(BAND_COLORS).map((band) => (
+                        <td key={band}>{g.bandCounts?.[band] ?? 0}</td>
+                      ))}
+                      <td>{g.escalated}</td>
+                      <td>{g.rising}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p style={{ color: 'var(--ink-muted)', textAlign: 'center', padding: '2rem' }}>No geographic data at this scope.</p>
+          )
         )}
       </div>
 

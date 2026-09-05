@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ReferenceLine, ResponsiveContainer, Area, AreaChart, ReferenceDot,
+  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
 } from 'recharts';
 import { api } from './api.js';
+import { IconClock, IconAlert } from './GovernmentBranding.jsx';
 
 const BAND_CLASS = { low: 'band-low', moderate: 'band-moderate', elevated: 'band-elevated', high: 'band-high' };
 const STAGE_LABELS = { investigation: 'Investigation', trial_active: 'Trial (active)', trial_pending: 'Trial (pending)', chargesheet_filed: 'Chargesheet filed', post_compensation: 'Post-compensation' };
@@ -61,6 +63,26 @@ export default function CaseDetail({ caseId, onBack }) {
     });
   }, [caseId]);
 
+  // Hooks must be called unconditionally — before any early returns.
+  const copySummary = useCallback(() => {
+    if (!data?.caseRecord) return;
+    const { caseRecord: cr, checkIns: ci, latest: la } = data;
+    const esc = la?.escalation ?? {};
+    const drvs = la?.explanation?.drivers ?? [];
+    const ints = la?.interventions ?? [];
+    const lines = [
+      `Case: ${cr.pseudonym} (${cr.caseId})`,
+      `Score: ${la?.score} (${la?.band})`,
+      `Stage: ${STAGE_LABELS[cr.caseStage] ?? cr.caseStage}`,
+      `Escalated: ${esc.triggered ? 'Yes' : 'No'}`,
+      `Check-ins: ${ci.length}`,
+      `Location: ${cr.district}, ${cr.state}`,
+    ];
+    if (drvs.length > 0) lines.push(`Drivers: ${drvs.map(d => d.label).join(', ')}`);
+    if (ints.length > 0) lines.push(`Interventions: ${ints.map(i => i.label).join(', ')}`);
+    navigator.clipboard?.writeText(lines.join('\n'));
+  }, [data]);
+
   if (loading) {
     return (
       <div>
@@ -77,6 +99,8 @@ export default function CaseDetail({ caseId, onBack }) {
   const { caseRecord, checkIns, trendData, latest } = data;
   const latestAssessment = latest;
   const escalation = latestAssessment?.escalation ?? {};
+  const prediction = latestAssessment?.prediction ?? {};
+  const emotions = latestAssessment?.emotions ?? {};
   const explanation = latestAssessment?.explanation ?? {};
   const drivers = explanation.drivers ?? [];
   const interventions = latestAssessment?.interventions ?? [];
@@ -99,7 +123,10 @@ export default function CaseDetail({ caseId, onBack }) {
 
   return (
     <div>
-      <button className="back-link animate-in" onClick={onBack}>&larr; Back to cases</button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <button className="back-link animate-in" onClick={onBack}>&larr; Back to cases</button>
+        <button className="btn-copy animate-in" onClick={copySummary}>📋 Copy Summary</button>
+      </div>
 
       {/* Case Header — Hero card */}
       <div className="card card-elevated animate-in animate-in-delay-1" style={{
@@ -172,6 +199,176 @@ export default function CaseDetail({ caseId, onBack }) {
           </p>
         )}
       </div>
+
+      {/* Emotions — radar chart + detail pills */}
+      {emotions.emotions && (
+        <div className="card animate-in animate-in-delay-2" style={{ marginTop: '1.25rem' }}>
+          <h2 style={{ fontSize: '1.05rem', margin: '0 0 0.75rem' }}>Emotion Profile</h2>
+
+          {/* Radar chart — all 6 emotions, detected ones highlighted */}
+          {(() => {
+            const ALL_EMOTIONS = [
+              { code: 'fear', label: 'Fear', weight: 0.9 },
+              { code: 'anger', label: 'Anger', weight: 0.7 },
+              { code: 'sadness', label: 'Sadness', weight: 0.6 },
+              { code: 'hopelessness', label: 'Hopelessness', weight: 0.85 },
+              { code: 'fatigue', label: 'Fatigue', weight: 0.5 },
+              { code: 'withdrawal', label: 'Withdrawal', weight: 0.65 },
+            ];
+            const detected = emotions.emotions || [];
+            const radarData = ALL_EMOTIONS.map((e) => {
+              const match = detected.find((d) => d.code === e.code);
+              return { emotion: e.label, value: match ? Math.round(match.intensity * 100) : 0 };
+            });
+
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '2rem', flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 280px', minWidth: 280 }}>
+                  <ResponsiveContainer width="100%" height={260}>
+                    <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="70%">
+                      <PolarGrid stroke="var(--line-faint)" />
+                      <PolarAngleAxis
+                        dataKey="emotion"
+                        tick={{ fontSize: 12, fill: 'var(--ink-soft)', fontWeight: 600 }}
+                      />
+                      <PolarRadiusAxis
+                        angle={30}
+                        domain={[0, 100]}
+                        tick={{ fontSize: 10, fill: 'var(--ink-faint)' }}
+                        axisLine={false}
+                      />
+                      <Radar
+                        name="Emotion"
+                        dataKey="value"
+                        stroke="var(--accent)"
+                        fill="var(--accent)"
+                        fillOpacity={0.25}
+                        strokeWidth={2}
+                      />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Detected emotion pills with quotes */}
+                <div style={{ flex: '1 1 300px', minWidth: 300 }}>
+                  {detected.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                      {detected.map((emotion) => (
+                        <div key={emotion.code} style={{
+                          display: 'flex', alignItems: 'center', gap: '0.75rem',
+                          padding: '0.65rem 0.85rem', borderRadius: 'var(--radius)',
+                          border: '1px solid var(--line-faint)', background: 'var(--surface)',
+                        }}>
+                          <div style={{
+                            width: 36, height: 36, borderRadius: '50%',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '0.75rem', fontWeight: 700, color: '#fff',
+                            background: emotion.intensity > 0.8 ? 'var(--risk-high)'
+                              : emotion.intensity > 0.6 ? 'var(--risk-elevated)'
+                              : 'var(--risk-moderate)',
+                          }}>
+                            {Math.round(emotion.intensity * 100)}%
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '0.88rem', fontWeight: 600 }}>{emotion.label}</div>
+                            <div style={{ fontSize: '0.78rem', color: 'var(--ink-muted)', fontStyle: 'italic' }}>
+                              "{emotion.matchedText}"
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p style={{ color: 'var(--ink-muted)', fontSize: '0.88rem', textAlign: 'center', padding: '2rem' }}>
+                      No specific emotions detected from this check-in.
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
+          {emotions.primaryEmotion && (
+            <div style={{
+              marginTop: '0.85rem', padding: '0.5rem 0.75rem',
+              background: 'var(--accent-pale)', borderRadius: 'var(--radius-sm)',
+              fontSize: '0.82rem', color: 'var(--accent)', fontWeight: 500,
+            }}>
+              Primary emotion: <strong>{emotions.primaryEmotion}</strong>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Prediction — estimated time to escalation */}
+      {prediction.predicted && (
+        <div className="card animate-in animate-in-delay-2" style={{
+          marginTop: '1.25rem',
+          borderLeft: '4px solid var(--risk-moderate)',
+          background: prediction.estimatedDaysToThreshold <= 14
+            ? 'var(--risk-high-bg)'
+            : 'var(--risk-moderate-bg)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+            <div className={`section-icon ${prediction.estimatedDaysToThreshold <= 14 ? 'section-icon-high' : 'section-icon-moderate'}`}>
+              <IconClock size={20} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <h2 style={{
+                fontSize: '1.05rem',
+                margin: '0 0 0.35rem',
+                color: prediction.estimatedDaysToThreshold <= 14 ? 'var(--risk-high)' : 'var(--risk-moderate)',
+              }}>
+                Trend Prediction
+              </h2>
+              <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: 1.5, color: 'var(--ink-soft)' }}>
+                {prediction.estimatedDaysToThreshold <= 14
+                  ? `Estimated escalation in approximately ${prediction.estimatedDaysToThreshold} days (${prediction.estimatedDate}). Current trajectory is concerning.`
+                  : `If current trajectory continues, estimated escalation in approximately ${prediction.estimatedDaysToThreshold} days (${prediction.estimatedDate}).`
+                }
+              </p>
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '0.65rem', flexWrap: 'wrap' }}>
+                <span style={{
+                  fontSize: '0.78rem',
+                  padding: '0.2rem 0.6rem',
+                  borderRadius: 'var(--radius-full)',
+                  background: prediction.confidence === 'high'
+                    ? 'var(--risk-low-bg)'
+                    : prediction.confidence === 'medium'
+                      ? 'var(--risk-moderate-bg)'
+                      : 'var(--risk-elevated-bg)',
+                  color: prediction.confidence === 'high'
+                    ? 'var(--risk-low)'
+                    : prediction.confidence === 'medium'
+                      ? 'var(--risk-moderate)'
+                      : 'var(--risk-elevated)',
+                  fontWeight: 600,
+                }}>
+                  Confidence: {prediction.confidence}
+                </span>
+                {prediction.courtDateRisk && (
+                  <span style={{
+                    fontSize: '0.78rem',
+                    padding: '0.2rem 0.6rem',
+                    borderRadius: 'var(--radius-full)',
+                    background: 'var(--risk-high-bg)',
+                    color: 'var(--risk-high)',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.3rem',
+                  }}>
+                    <IconAlert size={14} /> Court date within window
+                  </span>
+                )}
+              </div>
+              <p style={{ margin: '0.65rem 0 0', fontSize: '0.78rem', color: 'var(--ink-muted)', fontStyle: 'italic' }}>
+                {prediction.reasoning}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Trend Chart */}
       {chartData.length >= 2 && (

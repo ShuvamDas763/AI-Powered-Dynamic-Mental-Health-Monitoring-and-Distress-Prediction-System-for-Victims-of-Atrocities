@@ -21,6 +21,8 @@ import { authRouter } from './routes/auth.js';
 import { checkinRouter } from './routes/checkin.js';
 import { counsellorRouter } from './routes/counsellor.js';
 import { adminRouter } from './routes/admin.js';
+import { notificationsRouter } from './routes/notifications.js';
+import { exportRouter } from './routes/export.js';
 import { devRouter } from './routes/dev.js';
 
 const app = express();
@@ -29,20 +31,10 @@ app.use(express.json({ limit: '256kb' }));
 
 // CORS — allow the deployed frontend origin. In development the Vite proxy
 // makes requests same-origin, so this is only exercised in production.
-const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-if (allowedOrigins.length > 0) {
-  app.use(cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (curl, server-to-server)
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-    credentials: true,
-  }));
-}
+app.use(cors({
+  origin: true,
+  credentials: true,
+}));
 
 // Trust proxy for HTTPS behind Render/Railway load balancer.
 app.set('trust proxy', 1);
@@ -76,6 +68,8 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/auth', authRouter);
 app.use('/api/checkin', checkinRouter);
+app.use('/api/notifications', notificationsRouter);
+app.use('/api/export', exportRouter);
 
 // TIER 1 — individual-level data. Guarded inside the router.
 app.use('/api/counsellor', counsellorRouter);
@@ -108,8 +102,8 @@ app.use((err, req, res, _next) => {
   res.status(500).json({ error: 'Something went wrong handling that request.' });
 });
 
-app.listen(config.port, () => {
+app.listen(config.port, '0.0.0.0', () => {
   console.log(`\n  SIH26094 distress-monitoring server`);
   for (const line of describeConfig()) console.log(`    ${line}`);
-  console.log(`\n  listening on http://localhost:${config.port}\n`);
+  console.log(`\n  listening on http://0.0.0.0:${config.port}\n`);
 });

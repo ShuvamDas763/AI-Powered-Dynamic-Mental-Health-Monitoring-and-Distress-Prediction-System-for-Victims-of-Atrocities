@@ -160,6 +160,7 @@ const PERSONA_B = {
     priorityTags: [PRIORITY_USE_CASE.SC_ST_ACT_BENEFICIARY, PRIORITY_USE_CASE.WITNESS_INTIMIDATION],
     preferredLocale: LOCALE.EN,
     contextNote: 'Witness in an active trial. Next appearance listed. Intimidation risk on record.',
+    nextHearingDate: '2026-09-15',
   },
   history: [
     {
@@ -367,6 +368,7 @@ const PERSONA_E = {
     priorityTags: [PRIORITY_USE_CASE.SC_ST_ACT_BENEFICIARY],
     preferredLocale: LOCALE.EN,
     contextNote: 'Pending over twelve months. Repeated adjournments recorded. Long check-in history.',
+    nextHearingDate: '2026-09-10',
   },
   history: [
     {

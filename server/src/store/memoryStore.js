@@ -48,6 +48,13 @@ export function createStore(options = {}) {
   /** caseId -> { caseRecord, raw, history, series }. */
   const cases = new Map();
 
+  /** victimUsername -> Array<{ id, caseId, type, message, createdAt, readAt }>. */
+  const notifications = new Map();
+  let notificationId = 0;
+
+  /** Audit trail — who accessed what, when. */
+  const auditLog = [];
+
   /** Recompute history and assessments for one case from its raw declarations. */
   function rebuild(entry) {
     const history = makeCheckInHistory(entry.caseRecord.caseId, entry.raw, { now: seedClock });
@@ -86,6 +93,62 @@ export function createStore(options = {}) {
   return {
     /** The clock the seed resolved against. Useful for deterministic tests. */
     seedClock,
+
+    // ── Audit Trail ───────────────────────────────────────────────────
+
+    /** Log an access event. */
+    logAccess({ userId, role, action, caseId, details }) {
+      auditLog.push({
+        timestamp: new Date().toISOString(),
+        userId,
+        role,
+        action,
+        caseId: caseId ?? null,
+        details: details ?? null,
+      });
+    },
+
+    /** Get recent audit entries (last 100). */
+    getAuditLog(limit = 100) {
+      return auditLog.slice(-limit);
+    },
+
+    // ── Notifications ──────────────────────────────────────────────────
+
+    /** Create a notification for a victim. */
+    addNotification(victimUsername, { caseId, type, message }) {
+      if (!notifications.has(victimUsername)) {
+        notifications.set(victimUsername, []);
+      }
+      const notification = {
+        id: `notif-${++notificationId}`,
+        caseId,
+        type,
+        message,
+        createdAt: new Date().toISOString(),
+        readAt: null,
+      };
+      notifications.get(victimUsername).push(notification);
+      return notification;
+    },
+
+    /** Get all notifications for a victim, newest first. */
+    getNotifications(victimUsername) {
+      return (notifications.get(victimUsername) ?? []).slice().reverse();
+    },
+
+    /** Get unread notification count for a victim. */
+    getUnreadCount(victimUsername) {
+      return (notifications.get(victimUsername) ?? []).filter((n) => !n.readAt).length;
+    },
+
+    /** Mark all notifications for a victim as read. */
+    markNotificationsRead(victimUsername) {
+      const now = new Date().toISOString();
+      for (const n of notifications.get(victimUsername) ?? []) {
+        if (!n.readAt) n.readAt = now;
+      }
+    },
 
     /** Case records only — no history, no scores. */
     listCases() {

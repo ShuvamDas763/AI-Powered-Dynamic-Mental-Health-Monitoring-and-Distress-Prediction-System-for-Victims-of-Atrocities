@@ -24,7 +24,9 @@
  * -------------------------------------------------------------------------
  * The exact response text lives in crisisResponse.js as a separate, editable
  * block. This module detects; that module decides what to say. The research
- * team reviews and rewrites crisisResponse.js before shipping.
+ * team has reviewed and approved the wording, including the decision that
+ * the chatbot refers to the helpline rather than asking about suicidal
+ * intent itself (protocol Section 6).
  */
 
 /**
@@ -100,6 +102,41 @@ const THREAT_SELF_CONTEXT = Object.freeze([
 ]);
 
 /**
+ * Fear of being assaulted, harmed, or attacked by others.
+ *
+ * This covers statements where a person expresses fear of violence FROM others
+ * — not self-harm. These are safety-critical statements indicating the person
+ * feels physically unsafe, which is especially significant for victims of
+ * atrocities under the SC/ST Act. A person who says "I will get assaulted
+ * again if I go out" needs immediate safety attention, not a routine follow-up.
+ *
+ * NOTE: This is distinct from THREAT_SELF_CONTEXT, which covers fear of being
+ * killed by others in the context of ongoing pressure. VIOLENCE_FEAR covers
+ * broader fear of physical harm or assault.
+ */
+const VIOLENCE_FEAR = Object.freeze([
+  /i\s+(will|would|might|could)\s+(get|be)\s+(assault(?:ed|ing)?|assulat(?:ed)?|attacked|beaten|hurt|harmed|raped|sexually\s+assaulted)/i,
+  /i(?:'m|\s+am)\s+(scared|afraid|terrified|frightened|worried)\s+(that\s+)?(they|someone|he|she|people)\s+(will|might|could|is\s+going\s+to)\s+(assault|attack|beat|hurt|harm|kill|rape|come\s+after)/i,
+  /i(?:'m|\s+am)\s+(scared|afraid|terrified|frightened|worried)\s+(to\s+go|about\s+going|of\s+going|when\s+i\s+go|if\s+i\s+go)\s+(out|outside|home|there|to\s+(the|work|market|school|hearing|court))/i,
+  /(?:i\s+)?(?:don'?t|do\s+not)\s+(feel\s+)?(safe|secure|protected)\s+(going|when|i\s+go|to\s+go|about|outside|out)/i,
+  /i\s+feel\s+(unsafe|insecure|threatened|intimidated|scared|afraid|terrified)\s+(when|if|because|about|going|to\s+go|if\s+i)/i,
+  /i\s+(will|might|could)\s+(get\s+)?(assault(?:ed|ing)?|assulat(?:ed)?|attacked|beaten|hurt|harmed|raped)\s+(again|if|i|when|by|because)/i,
+  /someone\s+(threatened|threatens)\s+(me\s+(if|when|because)|to\s+)?(assault|attack|beat|hurt|harm|kill|rape|come\s+after)/i,
+  /they\s+(threatened|threaten)\s+(to\s+)?(assault|attack|beat|hurt|harm|kill|rape|come\s+after)/i,
+  /i(?:'m|\s+am)\s+(scared|afraid|terrified)\s+(they|someone)\s+(will|might|could)\s+(come\s+to|come\s+for|find|show\s+up|attack|hurt)/i,
+  /i\s+(won'?t|will\s+not|can'?t|cannot)\s+(go\s+out|leave|go\s+alone|go\s+to|travel|walk)\s+(because|since|as|if|scared|afraid|terrified)/i,
+  /(?:afraid|scared|terrified)\s+(to\s+go|of\s+going)\s+(out|outside|there|to\s+(the|work|court|hearing))/i,
+  /(?:afraid|scared|terrified|worried)\s+.*(?:go|leave|travel|walk|appear|attend|testify|hearing|court)/i,
+  /(?:go|leave|travel|walk|appear|attend|testify|hearing|court).*(?:afraid|scared|terrified|worried)/i,
+  /(?:afraid|scared|terrified|worried)\s+(?:because|if|when|that).*(?:assault|attack|hurt|harm|threat|danger|unsafe)/i,
+  /someone\s+(?:threatened|warned|told).*(?:testify|go|appear|speak|talk|report|complain)/i,
+  // Hindi equivalents
+  /(?:मुझे|मैं).*(?:डर|भय|घबराहट).*(?:बाहर|निकल|जाना|निकलना)/,
+  /(?:बाहर|निकल).*(?:डर|भय|घबराहट|परेशानी).*(?:मुझे|मैं)/,
+  /(?:मार|पीट|हमला|चोट|नुकसान).*(?:देंगे|करेंगे|होगा)/,
+]);
+
+/**
  * All categories with metadata for explainability.
  * Order matters: METHOD_MEANS is checked first (highest urgency).
  */
@@ -108,6 +145,7 @@ const CRISIS_CATEGORIES = Object.freeze([
   { code: 'explicit_intent', label: 'Explicit statement about ending one\'s life', patterns: EXPLICIT_INTENT, urgency: 'high' },
   { code: 'hopelessness_finality', label: 'Hopelessness combined with finality language', patterns: HOPELESSNESS_FINALITY, urgency: 'high' },
   { code: 'threat_self_context', label: 'Expression of being unable to continue amid ongoing pressure', patterns: THREAT_SELF_CONTEXT, urgency: 'high' },
+  { code: 'violence_fear', label: 'Fear of being assaulted, harmed, or attacked by others', patterns: VIOLENCE_FEAR, urgency: 'high' },
 ]);
 
 /**

@@ -46,7 +46,7 @@ record of what actually exists — check it before demoing anything.
 | 6 | Admin dashboard — aggregate/anonymised view | **Done** |
 | 7 | Integration pass, persona seeding | **Done** |
 | 8 | Edge-case pass (Persona F) | **Done** |
-| 9 | Polish — design, copy, responsive, docs | Partial |
+| 9 | Polish — design, copy, responsive, bilingual UI, exports | **Done** |
 | 10 | Deployment — Vercel (frontend) + Render (backend) | **Ready** |
 
 ---
@@ -83,6 +83,19 @@ commit a key.
 `GET /api/health` reports which mode you are in (`live` or `cached-fallback`),
 and so does the client's Server panel.
 
+### One-command start (LAN demo)
+
+For the three-laptop live demo (victim / counsellor / admin on the same WiFi):
+
+```bash
+bash start.sh
+```
+
+The script starts both servers, prints this machine's LAN IP, and the client
+listens on `0.0.0.0` so other laptops on the same network can join at
+`http://<THIS_IP>:5173`. Laptop 1 opens the victim entry, laptop 2 signs in as
+counsellor, laptop 3 as admin — three roles, one live system.
+
 ### API routes
 
 | Route | Tier | Description |
@@ -92,12 +105,17 @@ and so does the client's Server panel.
 | `POST /api/auth/logout` | Public | End session |
 | `GET /api/auth/me` | Public | Current user (or null) |
 | `POST /api/checkin` | Victim only (self-scoped) | Submit check-in, live LLM analysis |
+| `GET /api/checkin/prompts/:caseId` | Victim (self-scoped) | Check-in opening prompts, per-case locale |
+| `GET /api/notifications` | Victim (self-scoped) | Own notifications + unread count |
+| `POST /api/notifications/read` | Victim (self-scoped) | Mark own notifications read |
 | `GET /api/counsellor/cases` | Tier 1 | Prioritised case queue |
 | `GET /api/counsellor/cases/:id` | Tier 1 | Case detail + history + trend |
 | `GET /api/counsellor/alerts` | Tier 1 | Escalated cases |
 | `GET /api/admin/summary` | Tier 2 | Headline counts |
 | `GET /api/admin/trends` | Tier 2 | Band distribution, trend directions |
 | `GET /api/admin/geography` | Tier 2 | Geographic breakdown (national/state/district) |
+| `GET /api/export/cases.csv` | Tier 1 | Per-case export (CSV) |
+| `GET /api/export/summary` | Tier 2 | Aggregate summary export (text report) |
 
 ### Demo sign-in
 
@@ -180,8 +198,11 @@ server/src/
     records.js        Record schema: case, check-in, assessment
     distressScore.js  Composite distress score (4 components)
     engagement.js     Engagement metrics and trend detection
+    emotions.js       Emotion profile per check-in (radar view)
+    prediction.js     Escalation trajectory estimation
     escalation.js     Deterministic escalation rule
     priorityWeighting.js  Priority-use-case weighting table
+    interventions.js  Scheme-mapped intervention recommendation table
     assessCase.js     Assessment pipeline: history -> scored series
   llm/
     prompts.js        LLM prompts and content-safety rules
@@ -189,21 +210,33 @@ server/src/
   routes/
     auth.js           Establishes the server-side role session
     checkin.js        Check-in submission with live LLM analysis
+    notifications.js  Victim-facing check-in receipts
+    export.js         CSV/report exports (tier-guarded)
     counsellor.js     TIER 1 — individual-level data (guarded router-wide)
     admin.js          TIER 2 — aggregate only (guarded router-wide)
   safety/
     contentPatterns.js  Content-safety regex patterns
+    crisisDetection.js  Pattern-based crisis hard-trigger (runs before the LLM)
+    crisisResponse.js   Crisis response wording (reviewed; offline-safe)
+    fallbackSignals.js  Offline signal detection (same vocabulary as the LLM)
   store/
     memoryStore.js    In-memory store with prioritised queue
 client/src/
   styles/tokens.css   Design tokens, with the visual brief explained inline
   App.jsx             Application shell with navigation
+  i18n.jsx            Hindi/English locale system (server + UI)
   LoginPage.jsx       Sign-in page (demo credentials)
   CounsellorDashboard.jsx  Case queue and alerts view
   CaseDetail.jsx      Individual case with trend chart and explainability
   AdminDashboard.jsx  Aggregate dashboard with charts and geography drill-down
+  IndiaMap.jsx        Interactive state-level map for the admin view
   CheckinChat.jsx     Victim-facing chatbot interface
 ```
+
+> **Note on private documentation:** pitch decks, speaker notes, judge-prep
+> briefings, and captured screenshots live in `docs/` locally but are
+> **deliberately git-ignored** — they are internal team material, not part of
+> the published prototype. See `.gitignore` for the exact list.
 
 Routers are organised **by access tier, not by feature**, so the separation is
 reviewable by reading the route files. A single-tier file per tier means an

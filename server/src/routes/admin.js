@@ -137,6 +137,10 @@ adminRouter.get('/geography', (req, res) => {
         ? (r) => r.district
         : (r) => r.state;
 
+  // Band-to-midpoint mapping for heat-map color. Uses band midpoints to
+  // derive a representative score without leaking exact individual scores.
+  const BAND_MIDPOINT = { low: 15, moderate: 40, elevated: 60, high: 80 };
+
   const groups = {};
   for (const row of filtered) {
     const key = groupBy(row);
@@ -147,6 +151,7 @@ adminRouter.get('/geography', (req, res) => {
         bandCounts: {},
         escalated: 0,
         rising: 0,
+        scoreSum: 0,
       };
       for (const band of Object.values(BAND)) {
         groups[key].bandCounts[band] = 0;
@@ -158,6 +163,8 @@ adminRouter.get('/geography', (req, res) => {
     }
     if (row.escalated) groups[key].escalated++;
     if (row.trendDirection === 'rising') groups[key].rising++;
+    // Approximate score from band midpoint — never leaks exact individual scores.
+    groups[key].scoreSum += BAND_MIDPOINT[row.band] ?? 50;
   }
 
   // Apply small-cell suppression to each group.
@@ -167,6 +174,8 @@ adminRouter.get('/geography', (req, res) => {
     bandCounts: g.bandCounts,
     escalated: suppress(g.escalated),
     rising: suppress(g.rising),
+    // Approximate average from band midpoints — not exact scores.
+    avgScore: g.total > 0 ? Math.round(g.scoreSum / g.total) : null,
   }));
 
   res.json({
