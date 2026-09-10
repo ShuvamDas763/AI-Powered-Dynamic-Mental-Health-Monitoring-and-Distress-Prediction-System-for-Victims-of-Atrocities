@@ -42,9 +42,12 @@
 
 /** Direct statements about wanting to end one's life, not wanting to be alive. */
 const EXPLICIT_INTENT = Object.freeze([
+  /\b(?:kill(?:ing)?\s+myself|commit(?:ting)?\s+suicide|suicid(?:e|al))\b/i,
+  /\b(?:i\s+)?(?:just\s+)?(?:wanna|want\s+to|gonna|going\s+to|will|might|should|plan\s+to|planning\s+to)\s+(?:die|kill\s+myself|end\s+(?:my\s+life|it\s+all))\b/i,
+  /\b(?:better\s+(?:if|off\s+if)\s+(?:i\s+)?(?:kill\s+myself|die|was\s+dead|died))\b/i,
   /(?:(?:what\s+if\s+i|should\s+i|i\s+might|i\s+will|let\s+me|i)\s+(?:just\s+)?)?(?:to\s+)?(?:end|ending|finish|finishing)\s+(?:(?:my|this(?:\s+[\w'-]+)?)\s+life|it\s+all)/i,
   /i\s+(want|wish|feel\s+like|feel\s+like\s+i)\s+(to\s+)?(end|ending|finish|finishing)\s+(my\s+)?life/i,
-  /i\s+(want|wish)\s+to\s+(die|kill\s+myself|end\s+it)/i,
+  /i\s+(want|wish|wanna)\s+(to\s+)?(die|kill\s+myself|end\s+it)/i,
   /i\s+(have\s+been\s+|keep\s+)?thinking\s+about\s+(end|ending|killing|finishing|kill|finish)\s+(it\s+all|(my\s+)?(life|myself))/i,
   /i\s+(don'?t|do\s+not)\s+want\s+to\s+(be\s+alive|live\s+anymore|live\s+here|go\s+on)/i,
   /i\s+(can'?t|cannot|can\s+not)\s+(go\s+on|take\s+this\s+anymore|do\s+this\s+anymore|live\s+like\s+this)/i,
@@ -62,6 +65,8 @@ const EXPLICIT_INTENT = Object.freeze([
 
 /** Hopelessness combined with finality or ending language. */
 const HOPELESSNESS_FINALITY = Object.freeze([
+  /\b(?:not\s+worth\s+(?:it|living|anything|life)?\s*anymore)\b/i,
+  /\bthis\s+is\s+not\s+worth\s+(?:it\s+)?anymore\b/i,
   /there'?s?\s+no\s+(point|reason)\s+(anymore|in\s+(going\s+on|living|anything))/i,
   /nothing\s+(matters|will\s+(ever\s+)?change|is\s+going\s+to\s+change|will\s+get\s+better)/i,
   /everyone\s+(would\s+be\s+better\s+off|is\s+better\s+off)\s+(without\s+me|dead)/i,

@@ -158,6 +158,7 @@ export async function analyseCheckIn(checkIn) {
       surfaceSentiment: Math.min(100, Math.max(0, Math.round(parsed.surfaceSentiment))),
       signals: Array.isArray(parsed.signals) ? parsed.signals : [],
       signalPhrases: verifyPhrases(rawPhrases, turns),
+      crisisDetected: Boolean(parsed.crisisDetected),
       notes: typeof parsed.notes === 'string' ? parsed.notes : '',
       provenance: { source: 'live', model, fallbackReason },
     };

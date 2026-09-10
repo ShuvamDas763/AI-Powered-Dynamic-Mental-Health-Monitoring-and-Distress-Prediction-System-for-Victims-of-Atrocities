@@ -63,11 +63,10 @@ checkinRouter.post('/', async (req, res) => {
     return res.status(403).json({ error: 'You can only submit check-ins for your own case.' });
   }
 
-  // ── CRISIS DETECTION (independent of LLM) ──────────────────────────────
-  // Runs BEFORE any model call, including cached-fallback. This is the one
-  // feature where a silent failure is unacceptable — the pattern check must
-  // fire even when the Groq API is unreachable.
-  const crisisResult = detectCrisisInCheckIn(turns);
+  // ── DUAL-ROUTE CRISIS DETECTION ──────────────────────────────────────────
+  // Route 1 (Deterministic Pattern Engine): Fast regex check that guarantees
+  // hard triggers fire even if offline, rate-limited, or in cached-fallback.
+  const patternCrisis = detectCrisisInCheckIn(turns);
 
   // Check if a crisis referral was already delivered in a previous system turn.
   // This distinguishes Turn 1 (initial crisis trigger -> deliver Tele-MANAS referral)
@@ -87,6 +86,27 @@ checkinRouter.post('/', async (req, res) => {
   // Run the LLM analysis on the conversation.
   const analysis = await analyseCheckIn({ turns, locale: locale ?? 'en' });
 
+  // Route 2 (Semantic AI Classifier): Deep intent & metaphor comprehension.
+  // Catches indirect self-harm ideation, veiled thoughts of death, or novel
+  // despair that do not match fixed regex keywords.
+  const isSemanticCrisis = analysis.crisisDetected === true || (
+    analysis.surfaceSentiment >= 85 && analysis.signals.includes('hopelessness')
+  );
+
+  const crisisTriggered = patternCrisis.triggered || isSemanticCrisis;
+  const crisisCategory = patternCrisis.category || 'explicit_intent';
+  const crisisCategoryLabel = patternCrisis.categoryLabel || 'Semantic self-harm or acute crisis detected by AI';
+  const crisisUrgency = patternCrisis.urgency || (analysis.surfaceSentiment >= 90 ? 'critical' : 'high');
+  const crisisMatchedText = patternCrisis.matchedText || analysis.signalPhrases?.[0] || 'Semantic crisis evaluation';
+
+  const crisisResult = {
+    triggered: crisisTriggered,
+    category: crisisCategory,
+    categoryLabel: crisisCategoryLabel,
+    urgency: crisisUrgency,
+    matchedText: crisisMatchedText,
+  };
+
   // Record the check-in with the LLM's reading, plus crisis metadata if detected.
   const assessment = store.appendCheckIn(caseId, {
     turns: turns.map((t) => ({
@@ -95,7 +115,7 @@ checkinRouter.post('/', async (req, res) => {
     })),
     locale: locale ?? 'en',
     channel: channel ?? 'app',
-    surfaceSentiment: crisisResult.triggered ? 95 : analysis.surfaceSentiment,
+    surfaceSentiment: crisisResult.triggered ? Math.max(95, analysis.surfaceSentiment) : analysis.surfaceSentiment,
     signals: analysis.signals,
     signalPhrases: analysis.signalPhrases,
     immediateReviewRequested: crisisResult.triggered ? true : false,

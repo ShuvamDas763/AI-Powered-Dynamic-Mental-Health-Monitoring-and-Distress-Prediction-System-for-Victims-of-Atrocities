@@ -239,208 +239,248 @@ export default function CheckinChat({ user }) {
 
   // Chat interface
   return (
-    <div style={{ maxWidth: '48rem' }}>
-      <button className="back-link animate-in" onClick={() => { setSelectedCase(null); setMessages([]); setLastAssessment(null); setCrisisActive(false); }}>
-        &larr; Change case
-      </button>
+    <div className="checkin-layout">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem' }}>
+        <button
+          className="back-link animate-in"
+          onClick={() => { setSelectedCase(null); setMessages([]); setLastAssessment(null); setCrisisActive(false); }}
+        >
+          &larr; Change case
+        </button>
+        <span style={{ fontSize: '0.82rem', color: 'var(--ink-muted)' }}>
+          Active Case: <strong style={{ color: 'var(--ink)' }}>{selectedCase}</strong> · {locale === 'hi' ? 'हिंदी सत्र' : 'English Session'}
+        </span>
+      </div>
 
-      <div className="card card-elevated animate-in animate-in-delay-1 chat-container" style={{ height: 'calc(100vh - 10rem)' }}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--line-faint)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 700, color: '#fff' }}>
-              {locale === 'hi' ? 'अ' : 'En'}
-            </div>
-            <div>
-              <strong style={{ fontSize: '0.9rem' }}>{selectedCase}</strong>
-              <span style={{ fontSize: '0.78rem', color: 'var(--ink-muted)', marginLeft: '0.5rem' }}>
-                {locale === 'hi' ? 'Hindi' : 'English'}
-              </span>
-              <span style={{ fontSize: '0.72rem', padding: '0.15rem 0.5rem', borderRadius: 'var(--radius-full)', background: 'var(--accent-pale)', color: 'var(--accent)', fontWeight: 600, marginLeft: '0.25rem' }}>
-                {channel.toUpperCase()}
-              </span>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ fontSize: '0.72rem', color: 'var(--ink-muted)', padding: '0.2rem 0.6rem', background: 'var(--surface-sunken)', borderRadius: 'var(--radius-full)' }}>
-              {messages.filter((m) => m.speaker === 'person').length} replies
-            </span>
-          </div>
-        </div>
-
-        {/* Pinned Emergency SOS Banner */}
-        {crisisActive && (
-          <div className="crisis-sos-banner" role="alert">
-            <div className="crisis-sos-header">
-              <div className="crisis-sos-badge">
-                <span className="crisis-pulsing-dot" />
-                <span>{locale === 'hi' ? '🚨 संकट सहायता सक्रिय · परामर्शदाता को सूचित किया गया' : '🚨 Crisis Support Active · Counsellor Alerted'}</span>
-              </div>
-              <div className="crisis-sos-actions">
-                <a
-                  href="tel:14416"
-                  className="btn-sos"
-                  aria-label={locale === 'hi' ? 'Tele-MANAS को 14416 पर कॉल करें' : 'Call Tele-MANAS at 14416'}
-                >
-                  📞 {locale === 'hi' ? 'Tele-MANAS: 14416' : 'Call Tele-MANAS: 14416'}
-                </a>
-                <a
-                  href="tel:18008914416"
-                  className="btn-sos-secondary"
-                  title="Toll-free 1-800-891-4416"
-                >
-                  1-800-891-4416
-                </a>
-                <a
-                  href="tel:112"
-                  className="btn-sos-emergency"
-                  title="National Emergency Helpline 112"
-                >
-                  🚨 112
-                </a>
-              </div>
-            </div>
-            <p className="crisis-sos-desc">
-              {locale === 'hi'
-                ? 'हमारी सहायता टीम को सूचित कर दिया गया है। प्रशिक्षित परामर्शदाता 24/7 सहायता के लिए उपलब्ध हैं। आपको अकेले इससे नहीं गुज़रना है।'
-                : 'A dedicated welfare officer has received an immediate alert and will follow up. Tele-MANAS counsellors are available 24/7 in your language.'}
-            </p>
-          </div>
-        )}
-
-        {/* Messages */}
-        <div className="chat-messages">
-          {messages.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--ink-muted)', fontSize: '0.9rem' }}>
-              Starting check-in conversation...
-            </div>
-          )}
-          {messages.map((m, i) => (
-            <div key={i}>
-              <div className={`chat-bubble ${m.speaker} ${m.isCrisis ? 'crisis-system' : ''}`}>
-                {m.isCrisis && (
-                  <div className="crisis-msg-tag">
-                    🛡️ {locale === 'hi' ? 'सहायता एवं सुरक्षा' : 'Support & Safety'}
+      <div className="checkin-grid animate-in animate-in-delay-1">
+        {/* Left column: The Chat Interface */}
+        <div className="checkin-chat-col">
+          <div className="chat-container">
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--line-faint)', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.78rem', fontWeight: 700, color: '#fff', boxShadow: 'var(--shadow-sm)' }}>
+                  {locale === 'hi' ? 'अ' : 'En'}
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <strong style={{ fontSize: '0.94rem' }}>{selectedCase}</strong>
+                    <span style={{ fontSize: '0.72rem', padding: '0.15rem 0.55rem', borderRadius: 'var(--radius-full)', background: 'var(--accent-pale)', color: 'var(--accent)', fontWeight: 600 }}>
+                      {channel.toUpperCase()}
+                    </span>
                   </div>
-                )}
-                {m.text}
+                  <span style={{ fontSize: '0.78rem', color: 'var(--ink-muted)' }}>
+                    {locale === 'hi' ? 'दैनिक संबल एवं कल्याण संवाद' : 'Daily Well-being Check-in'}
+                  </span>
+                </div>
               </div>
-              {m.time && (
-                <div className={`msg-timestamp`} style={{ textAlign: m.speaker === 'system' ? 'left' : 'right' }}>
-                  {formatTime(m.time)}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '0.74rem', color: 'var(--ink-muted)', padding: '0.2rem 0.65rem', background: 'var(--surface-sunken)', borderRadius: 'var(--radius-full)', fontWeight: 500 }}>
+                  {messages.filter((m) => m.speaker === 'person').length} responses
+                </span>
+              </div>
+            </div>
+
+            {/* Pinned Emergency SOS Banner */}
+            {crisisActive && (
+              <div className="crisis-sos-banner" role="alert">
+                <div className="crisis-sos-header">
+                  <div className="crisis-sos-badge">
+                    <span className="crisis-pulsing-dot" />
+                    <span>{locale === 'hi' ? '🚨 संकट सहायता सक्रिय · परामर्शदाता को सूचित किया गया' : '🚨 Crisis Support Active · Counsellor Alerted'}</span>
+                  </div>
+                  <div className="crisis-sos-actions">
+                    <a
+                      href="tel:14416"
+                      className="btn-sos"
+                      aria-label={locale === 'hi' ? 'Tele-MANAS को 14416 पर कॉल करें' : 'Call Tele-MANAS at 14416'}
+                    >
+                      📞 {locale === 'hi' ? 'Tele-MANAS: 14416' : 'Call Tele-MANAS: 14416'}
+                    </a>
+                    <a
+                      href="tel:18008914416"
+                      className="btn-sos-secondary"
+                      title="Toll-free 1-800-891-4416"
+                    >
+                      1-800-891-4416
+                    </a>
+                    <a
+                      href="tel:112"
+                      className="btn-sos-emergency"
+                      title="National Emergency Helpline 112"
+                    >
+                      🚨 112
+                    </a>
+                  </div>
+                </div>
+                <p className="crisis-sos-desc">
+                  {locale === 'hi'
+                    ? 'हमारी सहायता टीम को सूचित कर दिया गया है। प्रशिक्षित परामर्शदाता 24/7 सहायता के लिए उपलब्ध हैं। आपको अकेले इससे नहीं गुज़रना है।'
+                    : 'A dedicated welfare officer has received an immediate alert and will follow up. Tele-MANAS counsellors are available 24/7 in your language.'}
+                </p>
+              </div>
+            )}
+
+            {/* Messages */}
+            <div className="chat-messages">
+              {messages.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--ink-muted)', fontSize: '0.92rem' }}>
+                  Starting check-in conversation...
                 </div>
               )}
+              {messages.map((m, i) => (
+                <div key={i}>
+                  <div className={`chat-bubble ${m.speaker} ${m.isCrisis ? 'crisis-system' : ''}`}>
+                    {m.isCrisis && (
+                      <div className="crisis-msg-tag">
+                        🛡️ {locale === 'hi' ? 'सहायता एवं सुरक्षा' : 'Support & Safety'}
+                      </div>
+                    )}
+                    {m.text}
+                  </div>
+                  {m.time && (
+                    <div className={`msg-timestamp`} style={{ textAlign: m.speaker === 'system' ? 'left' : 'right' }}>
+                      {formatTime(m.time)}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {busy && (
+                <div>
+                  <div className="chat-bubble system" style={{ opacity: 0.9 }}>
+                    <span style={{ display: 'inline-flex', gap: '0.3rem', alignItems: 'center' }}>
+                      <span className="typing-dot" style={{ animationDelay: '0s' }}>●</span>
+                      <span className="typing-dot" style={{ animationDelay: '0.15s' }}>●</span>
+                      <span className="typing-dot" style={{ animationDelay: '0.3s' }}>●</span>
+                    </span>
+                    {' '}Analysing response & checking well-being...
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEnd} />
             </div>
-          ))}
-          {busy && (
-            <div>
-              <div className="chat-bubble system" style={{ opacity: 0.85 }}>
-                <span style={{ display: 'inline-flex', gap: '0.3rem', alignItems: 'center' }}>
-                  <span className="typing-dot" style={{ animationDelay: '0s' }}>●</span>
-                  <span className="typing-dot" style={{ animationDelay: '0.15s' }}>●</span>
-                  <span className="typing-dot" style={{ animationDelay: '0.3s' }}>●</span>
+
+            {/* Quick crisis de-escalation chips (anchored directly above input) */}
+            {crisisActive && (
+              <div className="crisis-chips-row">
+                <span style={{ fontSize: '0.74rem', color: 'var(--ink-muted)', alignSelf: 'center', fontWeight: 600, flexShrink: 0 }}>
+                  {locale === 'hi' ? 'त्वरित उत्तर:' : 'Quick reply:'}
                 </span>
-                {' '}Analysing your response...
+                {(locale === 'hi'
+                  ? ['मैं अभी सुरक्षित जगह पर हूँ', 'मुझे बस कोई सुनने वाला चाहिए', 'मैं बहुत थका हुआ महसूस कर रहा हूँ']
+                  : ["I'm in a safe place right now", 'I just need someone to listen', "I'm feeling completely exhausted"]
+                ).map((chipText) => (
+                  <button
+                    key={chipText}
+                    type="button"
+                    className="crisis-chip-btn"
+                    disabled={busy}
+                    onClick={() => {
+                      setInput(chipText);
+                    }}
+                  >
+                    {chipText}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Input */}
+            <div className="chat-input-row">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={locale === 'hi' ? 'अपना जवाब लिखें...' : 'Type your reply...'}
+                disabled={busy}
+                aria-label={locale === 'hi' ? 'अपना जवाब टाइप करें' : 'Type your reply'}
+              />
+              <button className="btn" onClick={sendReply} disabled={busy || !input.trim()} aria-label={locale === 'hi' ? 'भेजें' : 'Send reply'}>
+                {locale === 'hi' ? 'भेजें' : 'Send'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Right column: Monitoring, Voice & Check-in Controls */}
+        <div className="checkin-sidebar-col">
+          {/* Assessment summary — transparent scoring panel */}
+          {lastAssessment ? (
+            <AssessmentPanel assessment={lastAssessment} />
+          ) : (
+            <div className="card" style={{ padding: '1.25rem', background: 'var(--surface-sunken)', border: '1.5px dashed var(--line-strong)', borderRadius: 'var(--radius)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.65rem' }}>
+                <span style={{ fontSize: '1.2rem' }}>🛡️</span>
+                <strong style={{ fontSize: '0.92rem', color: 'var(--ink)' }}>Live Distress Monitoring</strong>
+              </div>
+              <p style={{ margin: '0 0 0.5rem', fontSize: '0.82rem', color: 'var(--ink-soft)', lineHeight: 1.5 }}>
+                {locale === 'hi'
+                  ? 'जैसे ही आप चेक-इन संदेश भेजेंगे, सिस्टम लाइव संकट स्कोर और स्पष्टीकरण प्रस्तुत करेगा।'
+                  : 'As you chat, the AI dynamically computes a distress score, emotional signals, and trajectory indicators.'}
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.74rem', color: 'var(--ink-muted)' }}>
+                <span>🔒 Confidential & Triage-only</span>
               </div>
             </div>
           )}
-          <div ref={messagesEnd} />
-        </div>
 
-        {/* Assessment summary — transparent scoring panel */}
-        {lastAssessment && (
-          <AssessmentPanel assessment={lastAssessment} />
-        )}
+          {/* Voice pattern */}
+          <VoicePatternIndicator caseId={selectedCase} enabled={channel === 'app'} />
 
-        {/* Consent acknowledgment */}
-        {!consentGiven && (
-          <label className="animate-in" style={{
-            display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 0.85rem', margin: '0.35rem 0',
-            background: 'var(--warm-pale)', borderRadius: 'var(--radius)', fontSize: '0.82rem', color: 'var(--ink-soft)',
-            cursor: 'pointer', border: '1px solid rgba(184, 134, 11, 0.12)',
-          }}>
-            <input
-              type="checkbox"
-              checked={consentGiven}
-              onChange={() => {
-                setConsentGiven(true);
-                try {
-                  const stored = JSON.parse(localStorage.getItem(CONSENT_KEY) ?? '{}');
-                  stored[selectedCase] = true;
-                  localStorage.setItem(CONSENT_KEY, JSON.stringify(stored));
-                } catch { /* ignore */ }
-              }}
-              style={{ accentColor: 'var(--accent)', width: 16, height: 16 }}
-            />
-            I understand this check-in helps connect me with support.
-          </label>
-        )}
-
-        {/* Voice pattern */}
-        <VoicePatternIndicator caseId={selectedCase} enabled={channel === 'app'} />
-
-        {/* Channel selector */}
-        <div style={{ display: 'flex', gap: '0.3rem', padding: '0.5rem 0', borderTop: '1px solid var(--line-faint)' }}>
-          {CHANNELS.map((ch) => (
-            <button
-              key={ch.id}
-              onClick={() => setChannel(ch.id)}
-              style={{
-                padding: '0.3rem 0.65rem', borderRadius: 'var(--radius-full)',
-                border: channel === ch.id ? '1.5px solid var(--accent)' : '1.5px solid var(--line)',
-                background: channel === ch.id ? 'var(--accent-pale)' : 'transparent',
-                color: channel === ch.id ? 'var(--accent)' : 'var(--ink-muted)',
-                fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
-                transition: 'all var(--duration-fast)', font: 'inherit',
-              }}
-            >
-              {ch.label}
-            </button>
-          ))}
-          <span style={{ fontSize: '0.72rem', color: 'var(--ink-faint)', alignSelf: 'center', marginLeft: '0.5rem' }}>
-            {channel === 'sms' ? 'Simulated — no real gateway' : channel === 'ivrs' ? 'Simulated — no live telephony' : 'Live channel'}
-          </span>
-        </div>
-
-        {/* Quick crisis de-escalation chips */}
-        {crisisActive && (
-          <div className="crisis-chips-row">
-            <span style={{ fontSize: '0.74rem', color: 'var(--ink-muted)', alignSelf: 'center', fontWeight: 600 }}>
-              {locale === 'hi' ? 'त्वरित उत्तर:' : 'Quick reply:'}
-            </span>
-            {(locale === 'hi'
-              ? ['मैं अभी सुरक्षित जगह पर हूँ', 'मुझे बस कोई सुनने वाला चाहिए', 'मैं बहुत थका हुआ महसूस कर रहा हूँ']
-              : ["I'm in a safe place right now", 'I just need someone to listen', "I'm feeling completely exhausted"]
-            ).map((chipText) => (
-              <button
-                key={chipText}
-                type="button"
-                className="crisis-chip-btn"
-                disabled={busy}
-                onClick={() => {
-                  setInput(chipText);
-                }}
-              >
-                {chipText}
-              </button>
-            ))}
+          {/* Channel selector */}
+          <div className="card" style={{ padding: '0.85rem 1rem' }}>
+            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--ink-soft)', marginBottom: '0.45rem' }}>
+              Check-in Channel
+            </div>
+            <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+              {CHANNELS.map((ch) => (
+                <button
+                  key={ch.id}
+                  onClick={() => setChannel(ch.id)}
+                  style={{
+                    padding: '0.3rem 0.65rem', borderRadius: 'var(--radius-full)',
+                    border: channel === ch.id ? '1.5px solid var(--accent)' : '1.5px solid var(--line)',
+                    background: channel === ch.id ? 'var(--accent-pale)' : 'transparent',
+                    color: channel === ch.id ? 'var(--accent)' : 'var(--ink-muted)',
+                    fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
+                    transition: 'all var(--duration-fast)', font: 'inherit',
+                  }}
+                >
+                  {ch.label}
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--ink-faint)', marginTop: '0.45rem' }}>
+              {channel === 'sms' ? 'Simulated SMS gateway' : channel === 'ivrs' ? 'Simulated IVRS voice telephony' : 'Native App channel (Web)'}
+            </div>
           </div>
-        )}
 
-        {/* Input */}
-        <div className="chat-input-row">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={locale === 'hi' ? 'अपना जवाब लिखें...' : 'Type your reply...'}
-            disabled={busy}
-            aria-label={locale === 'hi' ? 'अपना जवाब टाइप करें' : 'Type your reply'}
-          />
-          <button className="btn" onClick={sendReply} disabled={busy || !input.trim()} aria-label={locale === 'hi' ? 'भेजें' : 'Send reply'}>
-            {locale === 'hi' ? 'भेजें' : 'Send'}
-          </button>
+          {/* Consent acknowledgment */}
+          {!consentGiven && (
+            <label className="card" style={{
+              display: 'flex', alignItems: 'flex-start', gap: '0.65rem', padding: '0.85rem 1rem',
+              background: 'var(--warm-pale)', borderRadius: 'var(--radius)', fontSize: '0.8rem', color: 'var(--ink-soft)',
+              cursor: 'pointer', border: '1px solid rgba(184, 134, 11, 0.18)', lineHeight: 1.45,
+            }}>
+              <input
+                type="checkbox"
+                checked={consentGiven}
+                onChange={() => {
+                  setConsentGiven(true);
+                  try {
+                    const stored = JSON.parse(localStorage.getItem(CONSENT_KEY) ?? '{}');
+                    stored[selectedCase] = true;
+                    localStorage.setItem(CONSENT_KEY, JSON.stringify(stored));
+                  } catch { /* ignore */ }
+                }}
+                style={{ accentColor: 'var(--accent)', width: 16, height: 16, marginTop: '0.15rem' }}
+              />
+              <span>
+                <strong>Confidentiality Consent:</strong> I understand this check-in connects me with support, and my responses are reviewed by my assigned welfare officer.
+              </span>
+            </label>
+          )}
         </div>
       </div>
     </div>
@@ -453,68 +493,81 @@ export default function CheckinChat({ user }) {
  * and understands exactly what drove it.
  */
 function AssessmentPanel({ assessment }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   if (!assessment) return null;
   const { score, band, explanation, emotions, prediction, escalation, signals, provenance } = assessment;
   const drivers = explanation?.drivers ?? [];
   const bandColors = { low: '#4a7c59', moderate: '#a0722e', elevated: '#c45d3a', high: '#8b2e23' };
-  const bandBg = { low: 'rgba(74,124,89,0.08)', moderate: 'rgba(160,114,46,0.08)', elevated: 'rgba(196,93,58,0.08)', high: 'rgba(139,46,35,0.08)' };
+  const bandBg = { low: 'rgba(74,124,89,0.12)', moderate: 'rgba(160,114,46,0.12)', elevated: 'rgba(196,93,58,0.12)', high: 'rgba(139,46,35,0.12)' };
 
   return (
-    <div style={{
-      margin: '0.5rem 0', borderRadius: 'var(--radius)',
-      border: escalation?.triggered ? '1px solid var(--risk-elevated)' : '1px solid var(--line-faint)',
-      background: escalation?.triggered ? 'var(--risk-high-bg)' : 'var(--surface-sunken)',
-      animation: 'fadeIn 0.3s var(--ease-out)', overflow: 'hidden',
-    }}>
-      {/* Score header — always visible */}
+    <div
+      role="status"
+      aria-live="polite"
+      className="card card-elevated"
+      style={{
+        borderRadius: 'var(--radius)',
+        border: escalation?.triggered ? '1.5px solid var(--risk-elevated)' : '1px solid var(--line-strong)',
+        background: escalation?.triggered ? 'var(--risk-high-bg)' : 'var(--surface)',
+        animation: 'fadeIn 0.3s var(--ease-out)',
+        padding: 0,
+        overflow: 'hidden',
+      }}
+    >
+      {/* Score header */}
       <div
         onClick={() => setExpanded(!expanded)}
         style={{
-          padding: '0.75rem 1rem', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap',
+          padding: '0.85rem 1.1rem', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap',
+          background: escalation?.triggered ? 'rgba(186, 26, 26, 0.06)' : 'transparent',
+          borderBottom: expanded ? '1px solid var(--line-faint)' : 'none',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span style={{ fontWeight: 700, fontSize: '1.3rem', color: bandColors[band] }}>{score}</span>
+          <span style={{ fontWeight: 800, fontSize: '1.4rem', color: bandColors[band] || 'var(--ink)' }}>{score}</span>
           <span style={{
             fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase',
-            padding: '0.15rem 0.55rem', borderRadius: 'var(--radius-full)',
-            background: bandBg[band], color: bandColors[band],
+            padding: '0.2rem 0.6rem', borderRadius: 'var(--radius-full)',
+            background: bandBg[band] || 'var(--surface-sunken)', color: bandColors[band] || 'var(--ink)',
+            letterSpacing: '0.04em',
           }}>{band}</span>
         </div>
         {escalation?.triggered && (
-          <span style={{ color: 'var(--risk-high)', fontWeight: 700, fontSize: '0.82rem' }}>
-            ⚠ Escalated
+          <span style={{ color: 'var(--risk-high)', fontWeight: 700, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+            ⚠️ Escalated
           </span>
         )}
         {emotions?.primaryEmotion && (
           <span style={{ fontSize: '0.78rem', color: 'var(--ink-muted)' }}>
-            Emotion: {emotions.primaryEmotion}
+            Emotion: <strong>{emotions.primaryEmotion}</strong>
           </span>
         )}
-        <span style={{ color: 'var(--ink-muted)', marginLeft: 'auto', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+        <span style={{ color: 'var(--ink-muted)', marginLeft: 'auto', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
           {provenance?.source === 'live' ? '🟢 Live LLM' : '📋 Cached'}
-          <span style={{ marginLeft: '0.5rem' }}>{expanded ? '▴' : '▾'}</span>
+          <span style={{ marginLeft: '0.35rem', fontSize: '0.85rem' }}>{expanded ? '▴' : '▾'}</span>
         </span>
       </div>
 
       {/* Expanded breakdown */}
       {expanded && (
-        <div style={{ padding: '0 1rem 1rem', borderTop: '1px solid var(--line-faint)' }}>
+        <div style={{ padding: '0.85rem 1.1rem 1.1rem' }}>
           {/* Explanation headline */}
           {explanation?.headline && (
-            <p style={{ margin: '0.75rem 0 0.5rem', fontSize: '0.85rem', color: 'var(--ink-soft)', fontStyle: 'italic' }}>
-              {explanation.headline}
+            <p style={{ margin: '0 0 0.75rem', fontSize: '0.85rem', color: 'var(--ink-soft)', fontStyle: 'italic', lineHeight: 1.45 }}>
+              "{explanation.headline}"
             </p>
           )}
 
           {/* Component breakdown bars */}
           {drivers.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', margin: '0.5rem 0' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', margin: '0.5rem 0' }}>
+              <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Score Drivers
+              </span>
               {drivers.map((d) => (
                 <div key={d.component}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', marginBottom: '0.15rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', marginBottom: '0.2rem' }}>
                     <span style={{ fontWeight: 600, color: 'var(--ink-soft)' }}>{d.label}</span>
                     <span style={{ color: 'var(--ink-muted)' }}>{d.contribution} pts ({d.sharePct}%)</span>
                   </div>
@@ -522,11 +575,11 @@ function AssessmentPanel({ assessment }) {
                     <div style={{
                       height: '100%', borderRadius: 3,
                       width: `${Math.min(100, d.sharePct)}%`,
-                      background: bandColors[band], opacity: 0.7,
+                      background: bandColors[band] || 'var(--accent)', opacity: 0.8,
                       transition: 'width 0.5s ease-out',
                     }} />
                   </div>
-                  <p style={{ margin: '0.15rem 0 0', fontSize: '0.72rem', color: 'var(--ink-muted)', lineHeight: 1.4 }}>
+                  <p style={{ margin: '0.2rem 0 0', fontSize: '0.72rem', color: 'var(--ink-muted)', lineHeight: 1.35 }}>
                     {d.detail}
                   </p>
                 </div>
@@ -536,13 +589,13 @@ function AssessmentPanel({ assessment }) {
 
           {/* Signal phrases — person's own words */}
           {explanation?.signalPhrases?.length > 0 && (
-            <div style={{ margin: '0.5rem 0', padding: '0.5rem 0.75rem', background: 'var(--warm-pale)', borderRadius: 'var(--radius-sm)' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                Own words:{' '}
+            <div style={{ margin: '0.75rem 0 0.5rem', padding: '0.6rem 0.85rem', background: 'var(--warm-pale)', borderRadius: 'var(--radius-sm)' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '0.25rem' }}>
+                Person's own words:
               </span>
               {explanation.signalPhrases.map((p, i) => (
-                <span key={i} style={{ fontSize: '0.78rem', fontStyle: 'italic', color: 'var(--ink-soft)' }}>
-                  "{p}"{i < explanation.signalPhrases.length - 1 ? ', ' : ''}
+                <span key={i} style={{ fontSize: '0.78rem', fontStyle: 'italic', color: 'var(--ink-soft)', display: 'inline-block', marginRight: '0.4rem' }}>
+                  "{p}"{i < explanation.signalPhrases.length - 1 ? ',' : ''}
                 </span>
               ))}
             </div>
@@ -551,7 +604,7 @@ function AssessmentPanel({ assessment }) {
           {/* Prediction */}
           {prediction?.predicted && (
             <div style={{
-              margin: '0.5rem 0', padding: '0.6rem 0.85rem',
+              margin: '0.65rem 0 0.4rem', padding: '0.6rem 0.85rem',
               background: prediction.estimatedDaysToThreshold <= 14 ? 'var(--risk-high-bg)' : 'var(--risk-moderate-bg)',
               borderRadius: 'var(--radius-sm)', fontSize: '0.82rem',
             }}>
@@ -562,7 +615,7 @@ function AssessmentPanel({ assessment }) {
 
           {/* Escalation reasons */}
           {escalation?.triggered && escalation.triggerReasons?.length > 0 && (
-            <div style={{ margin: '0.5rem 0' }}>
+            <div style={{ margin: '0.65rem 0 0', borderTop: '1px solid var(--line-faint)', paddingTop: '0.5rem' }}>
               <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--risk-high)' }}>Escalation reasons:</span>
               <ul style={{ margin: '0.25rem 0 0', paddingLeft: '1.2rem' }}>
                 {escalation.triggerReasons.map((r) => (
