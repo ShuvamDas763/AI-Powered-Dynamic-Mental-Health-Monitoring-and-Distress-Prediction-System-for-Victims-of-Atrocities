@@ -48,6 +48,7 @@ record of what actually exists — check it before demoing anything.
 | 8 | Edge-case pass (Persona F) | **Done** |
 | 9 | Polish — design, copy, responsive, bilingual UI, exports | **Done** |
 | 10 | Deployment — Vercel (frontend) + Render (backend) | **Ready** |
+| 11 | Multi-stage crisis dialogue, dual-route escalation & SOS UI | **Done** |
 
 ---
 
@@ -95,6 +96,16 @@ The script starts both servers, prints this machine's LAN IP, and the client
 listens on `0.0.0.0` so other laptops on the same network can join at
 `http://<THIS_IP>:5173`. Laptop 1 opens the victim entry, laptop 2 signs in as
 counsellor, laptop 3 as admin — three roles, one live system.
+
+### Automated Testing
+
+Run the full automated test suite:
+
+```bash
+npm test
+```
+
+Executes **328 tests across 61 test suites** via Node's native test runner (`node --test`), verifying access control boundaries, scoring arithmetic, crisis detection, fallback signal extraction, and longitudinal assessment pipelines without network dependency.
 
 ### API routes
 
@@ -184,9 +195,54 @@ Phase 6 at `tests/e2e/access-control.spec.js`.
 
 ---
 
+## Crisis Dialogue & Dual-Route Escalation Architecture
+
+### 1. Multi-Stage Crisis Dialogue Protocol
+
+Traditional mental health chatbots output a static helpline announcement when a user expresses acute distress. When the user responds with exhaustion (*"no i m tired of all this"*), legacy bots repeat the identical wall-of-text script, destroying trust.
+
+Our system implements a **trauma-informed, multi-stage crisis dialogue protocol**:
+
+* **Turn 1 — Authoritative Safety Referral (QPR Framework):**
+  - Triggered immediately by pattern-based crisis hard-triggers (independent of LLM availability).
+  - Delivers an authoritative emergency referral to **Tele-MANAS** (`14416` / toll-free `1-800-891-4416`) and national emergency (`112`).
+  - Alerts the assigned welfare officer and places the case at the top of the counsellor queue.
+  - Activates a pinned **Emergency SOS Banner** in the victim UI with 1-tap dial buttons.
+* **Turns 2+ — Empathetic De-escalation & Psychological First Aid (PFA):**
+  - Keeps escalation active in the backend (`immediateReviewRequested: true`, `crisisDetected: true`).
+  - Instead of repeating the canned helpline block, generates contextual, non-repetitive de-escalation responses via `generateCrisisFollowUp()` (Groq LLM guided by `CRISIS_FOLLOW_UP_SYSTEM_PROMPT`, falling back to deterministic templates if offline).
+  - Classifies user intent across 5 psychological sub-states:
+    1. **Exhaustion & Giving Up** (*"tired of all this"*, *"can't continue"*, *"थक गया"*) — validates pain, relieves pressure, provides holding presence.
+    2. **Imminent Means / Method** (*"pills"*, *"rope"*, *"फाँसी"*, *"ज़हर"*) — urgent safety appeals, immediate emergency contacts.
+    3. **Connection Seeking** (*"just talk to me"*, *"no one cares"*) — active listening, non-judgmental presence.
+    4. **Calming / Grounding** (*"ok"*, *"sitting down"*) — physical grounding, breathing anchors.
+    5. **General Ongoing Distress** — supportive de-escalation without toxic positivity.
+
+### 2. Dual-Route Escalation Architecture
+
+Escalation is deterministic and does not rely on LLM discretion ([`server/src/domain/escalation.js`](server/src/domain/escalation.js)):
+
+* **Route 1: Priority-Adjusted Score Threshold ($\ge 65$):**
+  $$\text{Priority-Adjusted Score} = \min(100, \text{Distress Score} \times \text{Docket Sensitivity Weight})$$
+  Crossing 65 fires `threshold_crossed`.
+* **Route 2: Named Hard Triggers (Score-Independent):**
+  Even if a score reads low (e.g. 20 or 40), hard triggers escalate immediately:
+  - `crisis_detected`: Explicit self-harm or suicidal language detected.
+  - `immediate_review_requested`: Flagged for urgent human review by safety filter or model.
+  - `intimidation_on_witness_case`: Witness intimidation reported on a sensitive docket.
+  - `sustained_surface_mismatch`: Flat/polite replies paired with falling participation.
+  - `hopelessness_with_disengagement`: Expressions of hopelessness combined with withdrawal from contact.
+
+* **Top-of-Queue Priority:** In [`memoryStore.js`](server/src/store/memoryStore.js) (`prioritisedQueue()`), all escalated cases are sorted as a mandatory first block. An unescalated case scoring 60 can never outrank an escalated case scoring 40.
+
+---
+
 ## Project layout
 
 ```
+docs/
+  design-system.md      Institutional design system specifications (AHRQ/USWDS based)
+  intervention-table.md Research-grounded Indian scheme & legal provision mapping table
 server/src/
   access/         Two-tier access control. Read roles.js first.
     roles.js          Roles, data tiers, and the invariant they protect
@@ -200,16 +256,16 @@ server/src/
     engagement.js     Engagement metrics and trend detection
     emotions.js       Emotion profile per check-in (radar view)
     prediction.js     Escalation trajectory estimation
-    escalation.js     Deterministic escalation rule
+    escalation.js     Deterministic escalation rule (dual-route)
     priorityWeighting.js  Priority-use-case weighting table
     interventions.js  Scheme-mapped intervention recommendation table
     assessCase.js     Assessment pipeline: history -> scored series
   llm/
-    prompts.js        LLM prompts and content-safety rules
+    prompts.js        LLM prompts (analysis, follow-up, crisis PFA, moderation)
     groqClient.js     Groq API client with timeout, fallback, caching
   routes/
     auth.js           Establishes the server-side role session
-    checkin.js        Check-in submission with live LLM analysis
+    checkin.js        Check-in submission with live LLM analysis & multi-stage crisis
     notifications.js  Victim-facing check-in receipts
     export.js         CSV/report exports (tier-guarded)
     counsellor.js     TIER 1 — individual-level data (guarded router-wide)
@@ -217,12 +273,13 @@ server/src/
   safety/
     contentPatterns.js  Content-safety regex patterns
     crisisDetection.js  Pattern-based crisis hard-trigger (runs before the LLM)
-    crisisResponse.js   Crisis response wording (reviewed; offline-safe)
+    crisisResponse.js   Multi-stage crisis templates & PFA de-escalation engine
+    crisisResponse.test.js  Automated test suite for crisis dialogue & sub-states
     fallbackSignals.js  Offline signal detection (same vocabulary as the LLM)
   store/
     memoryStore.js    In-memory store with prioritised queue
 client/src/
-  styles/tokens.css   Design tokens, with the visual brief explained inline
+  styles/tokens.css   Design tokens, SOS banner, and accessibility styles
   App.jsx             Application shell with navigation
   i18n.jsx            Hindi/English locale system (server + UI)
   LoginPage.jsx       Sign-in page (demo credentials)
@@ -230,7 +287,7 @@ client/src/
   CaseDetail.jsx      Individual case with trend chart and explainability
   AdminDashboard.jsx  Aggregate dashboard with charts and geography drill-down
   IndiaMap.jsx        Interactive state-level map for the admin view
-  CheckinChat.jsx     Victim-facing chatbot interface
+  CheckinChat.jsx     Victim-facing chatbot with pinned SOS banner & grounding chips
 ```
 
 > **Note on private documentation:** pitch decks, speaker notes, judge-prep
