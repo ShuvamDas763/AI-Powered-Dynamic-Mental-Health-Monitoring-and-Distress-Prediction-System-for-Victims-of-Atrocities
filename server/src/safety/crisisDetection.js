@@ -42,6 +42,7 @@
 
 /** Direct statements about wanting to end one's life, not wanting to be alive. */
 const EXPLICIT_INTENT = Object.freeze([
+  /(?:(?:what\s+if\s+i|should\s+i|i\s+might|i\s+will|let\s+me|i)\s+(?:just\s+)?)?(?:to\s+)?(?:end|ending|finish|finishing)\s+(?:(?:my|this(?:\s+[\w'-]+)?)\s+life|it\s+all)/i,
   /i\s+(want|wish|feel\s+like|feel\s+like\s+i)\s+(to\s+)?(end|ending|finish|finishing)\s+(my\s+)?life/i,
   /i\s+(want|wish)\s+to\s+(die|kill\s+myself|end\s+it)/i,
   /i\s+(have\s+been\s+|keep\s+)?thinking\s+about\s+(end|ending|killing|finishing|kill|finish)\s+(it\s+all|(my\s+)?(life|myself))/i,

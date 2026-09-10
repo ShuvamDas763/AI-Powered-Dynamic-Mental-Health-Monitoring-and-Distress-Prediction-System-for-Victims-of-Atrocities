@@ -604,6 +604,162 @@ h3 { font-size: clamp(0.9rem, 1.5vw, 1rem); }
   box-shadow: 0 0 0 2px var(--accent-glow);
 }
 
+/* --- Crisis & SOS dialogue enhancements --- */
+.crisis-sos-banner {
+  background: linear-gradient(135deg, rgba(186, 26, 26, 0.07) 0%, rgba(255, 212, 201, 0.35) 100%);
+  border: 1.5px solid rgba(186, 26, 26, 0.28);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+  box-shadow: var(--shadow-sm);
+  animation: fadeIn 0.3s var(--ease-out) both;
+}
+
+.crisis-sos-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.crisis-sos-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--risk-high);
+}
+
+.crisis-pulsing-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--risk-high);
+  box-shadow: 0 0 0 0 rgba(186, 26, 26, 0.6);
+  animation: pulse 1.8s infinite;
+}
+
+.crisis-sos-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.btn-sos {
+  background: var(--risk-high);
+  color: #ffffff !important;
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-full);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: all var(--duration-fast);
+  box-shadow: 0 1px 4px rgba(186, 26, 26, 0.25);
+}
+
+.btn-sos:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(186, 26, 26, 0.35);
+}
+
+.btn-sos-secondary {
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  color: var(--ink-soft) !important;
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--radius-full);
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all var(--duration-fast);
+}
+
+.btn-sos-secondary:hover {
+  border-color: var(--accent);
+  color: var(--accent) !important;
+}
+
+.btn-sos-emergency {
+  background: rgba(186, 26, 26, 0.1);
+  border: 1px solid rgba(186, 26, 26, 0.25);
+  color: var(--risk-high) !important;
+  padding: 0.3rem 0.55rem;
+  border-radius: var(--radius-full);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.btn-sos-emergency:hover {
+  background: rgba(186, 26, 26, 0.2);
+}
+
+.crisis-sos-desc {
+  margin: 0.4rem 0 0;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  line-height: 1.4;
+}
+
+.chat-bubble.crisis-system {
+  background: rgba(255, 212, 201, 0.35);
+  border-left: 3.5px solid var(--risk-high);
+  color: var(--ink);
+}
+
+.crisis-msg-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--risk-high);
+  margin-bottom: 0.35rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.crisis-chips-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0;
+  margin-top: 0.25rem;
+  overflow-x: auto;
+  flex-wrap: wrap;
+}
+
+.crisis-chip-btn {
+  background: var(--surface-sunken);
+  border: 1px solid var(--line-strong);
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  font: inherit;
+  transition: all var(--duration-fast);
+  white-space: nowrap;
+}
+
+.crisis-chip-btn:hover:not(:disabled) {
+  background: var(--accent-pale);
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.crisis-chip-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* ═══ PAGE HEADERS ═══════════════════════════════════════════════════════ */
 
 .page-header {

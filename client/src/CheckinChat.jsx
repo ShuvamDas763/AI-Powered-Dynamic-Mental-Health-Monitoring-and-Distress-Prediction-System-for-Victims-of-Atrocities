@@ -44,6 +44,7 @@ export default function CheckinChat({ user }) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [crisisActive, setCrisisActive] = useState(false);
   const messagesEnd = useRef(null);
 
   const fetchNotifications = useCallback(async () => {
@@ -90,6 +91,7 @@ export default function CheckinChat({ user }) {
     setLocale(c?.locale ?? 'en');
     setMessages([]);
     setLastAssessment(null);
+    setCrisisActive(false);
 
     const initialPrompt = c?.locale === 'hi' ? INITIAL_PROMPTS_HI : INITIAL_PROMPTS_EN;
     setTimeout(() => {
@@ -123,11 +125,24 @@ export default function CheckinChat({ user }) {
         setLastAssessment(body.assessment);
       }
 
+      const isCrisis = Boolean(body.crisisResponse?.triggered || body.assessment?.crisisDetected);
+      if (isCrisis) {
+        setCrisisActive(true);
+      }
+
       const followUp = body.followUp
         || (locale === 'hi' ? FALLBACK_FOLLOW_UP_HI : FALLBACK_FOLLOW_UP_EN);
 
       setTimeout(() => {
-        setMessages((prev) => [...prev, { speaker: 'system', text: followUp, time: new Date().toISOString() }]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            speaker: 'system',
+            text: followUp,
+            time: new Date().toISOString(),
+            isCrisis,
+          },
+        ]);
       }, 300);
     } catch {
       setMessages((prev) => [
@@ -225,7 +240,7 @@ export default function CheckinChat({ user }) {
   // Chat interface
   return (
     <div style={{ maxWidth: '48rem' }}>
-      <button className="back-link animate-in" onClick={() => { setSelectedCase(null); setMessages([]); setLastAssessment(null); }}>
+      <button className="back-link animate-in" onClick={() => { setSelectedCase(null); setMessages([]); setLastAssessment(null); setCrisisActive(false); }}>
         &larr; Change case
       </button>
 
@@ -253,6 +268,46 @@ export default function CheckinChat({ user }) {
           </div>
         </div>
 
+        {/* Pinned Emergency SOS Banner */}
+        {crisisActive && (
+          <div className="crisis-sos-banner" role="alert">
+            <div className="crisis-sos-header">
+              <div className="crisis-sos-badge">
+                <span className="crisis-pulsing-dot" />
+                <span>{locale === 'hi' ? '🚨 संकट सहायता सक्रिय · परामर्शदाता को सूचित किया गया' : '🚨 Crisis Support Active · Counsellor Alerted'}</span>
+              </div>
+              <div className="crisis-sos-actions">
+                <a
+                  href="tel:14416"
+                  className="btn-sos"
+                  aria-label={locale === 'hi' ? 'Tele-MANAS को 14416 पर कॉल करें' : 'Call Tele-MANAS at 14416'}
+                >
+                  📞 {locale === 'hi' ? 'Tele-MANAS: 14416' : 'Call Tele-MANAS: 14416'}
+                </a>
+                <a
+                  href="tel:18008914416"
+                  className="btn-sos-secondary"
+                  title="Toll-free 1-800-891-4416"
+                >
+                  1-800-891-4416
+                </a>
+                <a
+                  href="tel:112"
+                  className="btn-sos-emergency"
+                  title="National Emergency Helpline 112"
+                >
+                  🚨 112
+                </a>
+              </div>
+            </div>
+            <p className="crisis-sos-desc">
+              {locale === 'hi'
+                ? 'हमारी सहायता टीम को सूचित कर दिया गया है। प्रशिक्षित परामर्शदाता 24/7 सहायता के लिए उपलब्ध हैं। आपको अकेले इससे नहीं गुज़रना है।'
+                : 'A dedicated welfare officer has received an immediate alert and will follow up. Tele-MANAS counsellors are available 24/7 in your language.'}
+            </p>
+          </div>
+        )}
+
         {/* Messages */}
         <div className="chat-messages">
           {messages.length === 0 && (
@@ -262,7 +317,12 @@ export default function CheckinChat({ user }) {
           )}
           {messages.map((m, i) => (
             <div key={i}>
-              <div className={`chat-bubble ${m.speaker}`}>
+              <div className={`chat-bubble ${m.speaker} ${m.isCrisis ? 'crisis-system' : ''}`}>
+                {m.isCrisis && (
+                  <div className="crisis-msg-tag">
+                    🛡️ {locale === 'hi' ? 'सहायता एवं सुरक्षा' : 'Support & Safety'}
+                  </div>
+                )}
                 {m.text}
               </div>
               {m.time && (
@@ -341,6 +401,31 @@ export default function CheckinChat({ user }) {
             {channel === 'sms' ? 'Simulated — no real gateway' : channel === 'ivrs' ? 'Simulated — no live telephony' : 'Live channel'}
           </span>
         </div>
+
+        {/* Quick crisis de-escalation chips */}
+        {crisisActive && (
+          <div className="crisis-chips-row">
+            <span style={{ fontSize: '0.74rem', color: 'var(--ink-muted)', alignSelf: 'center', fontWeight: 600 }}>
+              {locale === 'hi' ? 'त्वरित उत्तर:' : 'Quick reply:'}
+            </span>
+            {(locale === 'hi'
+              ? ['मैं अभी सुरक्षित जगह पर हूँ', 'मुझे बस कोई सुनने वाला चाहिए', 'मैं बहुत थका हुआ महसूस कर रहा हूँ']
+              : ["I'm in a safe place right now", 'I just need someone to listen', "I'm feeling completely exhausted"]
+            ).map((chipText) => (
+              <button
+                key={chipText}
+                type="button"
+                className="crisis-chip-btn"
+                disabled={busy}
+                onClick={() => {
+                  setInput(chipText);
+                }}
+              >
+                {chipText}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Input */}
         <div className="chat-input-row">

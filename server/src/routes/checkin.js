@@ -20,7 +20,7 @@
 import { Router } from 'express';
 import { requireVictim } from '../access/requireRole.js';
 import { store } from '../store/memoryStore.js';
-import { analyseCheckIn, generateFollowUp } from '../llm/groqClient.js';
+import { analyseCheckIn, generateFollowUp, generateCrisisFollowUp } from '../llm/groqClient.js';
 import { SPEAKER } from '../domain/records.js';
 import { detectCrisisInCheckIn } from '../safety/crisisDetection.js';
 import { getCrisisResponse } from '../safety/crisisResponse.js';
@@ -69,6 +69,21 @@ checkinRouter.post('/', async (req, res) => {
   // fire even when the Groq API is unreachable.
   const crisisResult = detectCrisisInCheckIn(turns);
 
+  // Check if a crisis referral was already delivered in a previous system turn.
+  // This distinguishes Turn 1 (initial crisis trigger -> deliver Tele-MANAS referral)
+  // from Turns 2+ (ongoing in-crisis dialogue -> deliver context-aware de-escalation
+  // rather than looping the identical canned response).
+  const hasPriorCrisisReferral = turns.some(
+    (t) => (t.speaker === SPEAKER.SYSTEM || t.speaker === 'system') && (
+      (typeof t.text === 'string' && (
+        t.text.includes('Tele-MANAS') ||
+        t.text.includes('14416') ||
+        t.text.includes('1-800-891-4416') ||
+        t.text.includes('टोल-फ़्री')
+      ))
+    ),
+  );
+
   // Run the LLM analysis on the conversation.
   const analysis = await analyseCheckIn({ turns, locale: locale ?? 'en' });
 
@@ -95,23 +110,48 @@ checkinRouter.post('/', async (req, res) => {
     } : null,
   });
 
-  // Generate a follow-up: crisis response overrides the normal conversational path.
+  // Generate a follow-up:
+  // - If crisis triggered for the FIRST time: deliver initial Tele-MANAS referral + support notice.
+  // - If crisis was ALREADY referred: deliver context-aware de-escalation & active listening.
+  // - Otherwise: normal conversational follow-up.
   let followUp;
   let crisisResponse = null;
 
   if (crisisResult.triggered) {
     const effectiveLocale = locale ?? caseRecord.preferredLocale ?? 'en';
     const response = getCrisisResponse(effectiveLocale, crisisResult.category);
-    followUp = response.steps.join('\n\n');
-    crisisResponse = {
-      triggered: true,
-      category: crisisResult.category,
-      categoryLabel: crisisResult.categoryLabel,
-      urgency: crisisResult.urgency,
-      matchedText: crisisResult.matchedText,
-      helpline: response.helpline,
-      counsellorNote: response.counsellorNote,
-    };
+
+    if (!hasPriorCrisisReferral) {
+      // Stage 1: Initial Crisis Trigger — authoritative QPR referral
+      followUp = response.steps.join('\n\n');
+      crisisResponse = {
+        triggered: true,
+        ongoing: false,
+        category: crisisResult.category,
+        categoryLabel: crisisResult.categoryLabel,
+        urgency: crisisResult.urgency,
+        matchedText: crisisResult.matchedText,
+        helpline: response.helpline,
+        counsellorNote: response.counsellorNote,
+      };
+    } else {
+      // Stage 2: Ongoing in-crisis conversation — empathetic de-escalation & active listening
+      followUp = await generateCrisisFollowUp({
+        turns,
+        locale: effectiveLocale,
+        category: crisisResult.category,
+      });
+      crisisResponse = {
+        triggered: true,
+        ongoing: true,
+        category: crisisResult.category,
+        categoryLabel: crisisResult.categoryLabel,
+        urgency: crisisResult.urgency,
+        matchedText: crisisResult.matchedText,
+        helpline: response.helpline,
+        counsellorNote: response.counsellorNote,
+      };
+    }
   } else {
     const effectiveLocale = locale ?? caseRecord.preferredLocale ?? 'en';
     followUp = await generateFollowUp({ turns, locale: effectiveLocale });

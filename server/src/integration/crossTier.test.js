@@ -240,6 +240,46 @@ describe('Crisis detection through checkin route', () => {
     assert.equal(body.crisisResponse.category, 'explicit_intent');
   });
 
+  test('subsequent turns in crisis receive context-aware de-escalation rather than repeating helpline block', async () => {
+    // Turn 1: Initial crisis trigger
+    const turns1 = [
+      { speaker: 'system', text: 'How have things been since we last checked in?' },
+      { speaker: 'person', text: 'i feel like ending my life' },
+    ];
+    const res1 = await authedPost('/api/checkin', victimCookie, {
+      caseId: 'SIH-CASE-0001',
+      turns: turns1,
+      locale: 'en',
+      channel: 'app',
+    });
+    const body1 = await res1.json();
+    assert.equal(body1.ok, true);
+    assert.equal(body1.crisisResponse.triggered, true);
+    assert.equal(body1.crisisResponse.ongoing, false);
+    assert.ok(body1.followUp.includes('Tele-MANAS'));
+
+    // Turn 2: User says "no i m tired of all this"
+    const turns2 = [
+      ...turns1,
+      { speaker: 'system', text: body1.followUp },
+      { speaker: 'person', text: 'no i m tired of all this' },
+    ];
+    const res2 = await authedPost('/api/checkin', victimCookie, {
+      caseId: 'SIH-CASE-0001',
+      turns: turns2,
+      locale: 'en',
+      channel: 'app',
+    });
+    const body2 = await res2.json();
+    assert.equal(body2.ok, true);
+    assert.equal(body2.crisisResponse.triggered, true);
+    assert.equal(body2.crisisResponse.ongoing, true);
+    // Must NOT repeat the exact 3-paragraph canned referral block
+    assert.notEqual(body2.followUp, body1.followUp);
+    // Must acknowledge exhaustion or carrying weight
+    assert.match(body2.followUp, /tired|exhausted|weight|carry|alone|breath/i);
+  });
+
   test('victim cannot submit check-in for another case', async () => {
     const res = await authedPost('/api/checkin', victimCookie, {
       caseId: 'SIH-CASE-0002', // Not victim's case

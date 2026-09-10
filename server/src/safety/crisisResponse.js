@@ -150,3 +150,151 @@ export function getCrisisResponse(locale, category) {
   }
   return CRISIS_RESPONSE[locale] ?? CRISIS_RESPONSE.en;
 }
+
+/**
+ * Ongoing crisis dialogue responses — shown when a person in an active crisis
+ * state continues the conversation (turns 2+ after the initial crisis trigger).
+ *
+ * Rather than repeating the identical 3-paragraph Tele-MANAS referral verbatim,
+ * this engine actively validates the person's specific emotional state
+ * (exhaustion, resistance, seeking connection, imminent means), removes pressure,
+ * provides grounded presence, and keeps the human safety path open.
+ */
+const ONGOING_CRISIS_TEMPLATES = Object.freeze({
+  en: {
+    exhaustion: [
+      'I hear how deeply exhausted you are right now. You have been carrying an overwhelming weight for so long, and it makes complete sense that you feel tired of all this. You don\'t have to figure anything out or fix anything right this second. I am right here with you.',
+      'I hear you. When everything feels this heavy, even continuing to talk can feel like too much. You don\'t have to carry this alone, and you don\'t have to make any decisions right now. Can you just take a slow breath with me? Are you somewhere safe to sit down?',
+      'It is completely understandable that you feel worn out and don\'t want to continue like this. You have been through so much. Our support team has already been notified and is stepping in to reach you, so you don\'t have to fight this by yourself. I am right here listening.',
+    ],
+    means_imminent: [
+      'Please pause and step back from any immediate danger right now. Your safety and your life matter deeply. Is there someone nearby you can be with right this second? Please dial emergency services (112) or call Tele-MANAS at 14416 immediately. Please stay with me.',
+      'Please stay where you are and do not harm yourself. You matter, and help is available right now. If you can, call 112 or Tele-MANAS (14416) immediately. I am staying right here with you — please talk to me.',
+    ],
+    connection_seeking: [
+      'I am listening to you, and I am right here. You are not alone, and what you are feeling matters deeply. You don\'t have to pretend everything is okay. If you feel up to sharing, what is feeling the heaviest on you right now?',
+      'I hear you, and I want to be here with you. What you have been through is real and painful, and you don\'t have to sit in silence with this. Take your time — I am listening.',
+    ],
+    calming_receptive: [
+      'Thank you for staying with me. Just focus on slow, gentle breaths right now. You don\'t have to do anything else. A member of our support team is on their way to connect with you.',
+      'I\'m really glad you are still here with me. Just resting and breathing is enough right now. Help is on the way, and you do not have to walk through this alone.',
+    ],
+    general_ongoing: [
+      'I hear you, and I am staying right here with you. What you are going through is really painful, but you don\'t have to go through it alone. Can you let me know if you are in a safe place right now?',
+      'Thank you for continuing to talk to me. You don\'t have to carry all this pain by yourself. Our support team has been notified, and someone will follow up with you. I am right here with you.',
+      'Take whatever time you need. There is no pressure here. What you feel is valid, and you deserve support. I am staying here with you.',
+    ],
+  },
+
+  hi: {
+    exhaustion: [
+      'मैं समझ सकता हूँ कि आप कितने गहरे रूप से थक चुके हैं। आप बहुत समय से इतना भारी बोझ उठा रहे हैं, और इस सब से थक जाना पूरी तरह स्वाभाविक है। अभी आपको कुछ भी ठीक करने या कोई फ़ैसला लेने की ज़रूरत नहीं है। मैं यहीं आपके साथ हूँ।',
+      'मैं आपकी बात सुन रहा हूँ। जब सब कुछ इतना भारी लगता है, तो बात जारी रखना भी बहुत मुश्किल हो जाता है। आपको यह सब अकेले नहीं सहना है। क्या आप मेरे साथ बस एक गहरी साँस ले सकते हैं? क्या आप अभी किसी सुरक्षित जगह पर बैठे हैं?',
+      'इतना थकावट महसूस करना और आगे न बढ़ पाना बहुत स्वाभाविक है। आपने बहुत कुछ झेला है। हमारी सहायता टीम को सूचित कर दिया गया है और वह आपसे संपर्क कर रही है। आपको अकेले नहीं लड़ना पड़ेगा।',
+    ],
+    means_imminent: [
+      'कृपया किसी भी ख़तरे से तुरंत पीछे हटें। आपकी सुरक्षा और आपकी ज़िंदगी बहुत कीमती है। क्या आपके आसपास कोई है जिसके साथ आप अभी रह सकते हैं? कृपया तुरंत 112 या Tele-MANAS (14416) पर कॉल करें। कृपया यहीं बने रहें।',
+      'कृपया सुरक्षित रहें और खुद को कोई नुक़सान न पहुँचाएँ। आपकी ज़िंदगी बहुत मायने रखती है। तुरंत 112 या Tele-MANAS (14416) से संपर्क करें। मैं यहीं आपके साथ हूँ।',
+    ],
+    connection_seeking: [
+      'मैं आपकी बात सुन रहा हूँ, और मैं यहीं आपके साथ हूँ। आप अकेले नहीं हैं, और आप जो महसूस कर रहे हैं वह महत्वपूर्ण है। अगर आप बताना चाहें, तो अभी आपको सबसे ज़्यादा क्या परेशान कर रहा है?',
+      'मैं आपकी बात ध्यान से सुन रहा हूँ। आपको यह सब अकेले सहने की ज़रूरत नहीं है। अपना समय लें — मैं सुनने के लिए तैयार हूँ।',
+    ],
+    calming_receptive: [
+      'मेरे साथ यहाँ बने रहने के लिए धन्यवाद। धीरे-धीरे गहरी साँस लें। अभी आपको कुछ और करने की ज़रूरत नहीं है। हमारी सहायता टीम आपसे जल्द ही संपर्क करेगी।',
+      'मुझे ख़ुशी है कि आप अभी भी यहाँ हैं। बस आराम करें और साँस लें। मदद आ रही है और आपको अकेले इससे नहीं गुज़रना है।',
+    ],
+    general_ongoing: [
+      'मैं आपकी बात सुन रहा हूँ, और मैं यहीं आपके साथ हूँ। आप जिससे गुज़र रहे हैं वह बहुत कठिन है, लेकिन आपको अकेले इससे नहीं गुज़रना है। क्या आप मुझे बता सकते हैं कि क्या आप अभी किसी सुरक्षित जगह पर हैं?',
+      'मुझसे बात करते रहने के लिए धन्यवाद। आपको यह सारा दर्द अकेले उठाने की ज़रूरत नहीं है। हमारी सहायता टीम को बता दिया गया है, और कोई आपसे संपर्क करेगा।',
+    ],
+  },
+});
+
+/**
+ * Patterns to classify the psychological intent of subsequent turns in crisis.
+ */
+const ONGOING_CRISIS_PATTERNS = Object.freeze({
+  means_imminent: [
+    /\b(pills?|tablets?|overdose)\b/i,
+    /\b(rope|noose|hang|hanging)\b/i,
+    /\b(blade|knife|razor|slit|cutting)\b/i,
+    /\b(jump|jumping|bridge|terrace|roof)\b/i,
+    /\b(poison|drown|drowning)\b/i,
+    /ज़हर|फाँसी|गोली|कूद|डूबना/i,
+  ],
+  exhaustion: [
+    /tired\s+(of|with|from)\s+(all\s+this|this|it|everything|life)/i,
+    /(?:so|too|very)\s+tired/i,
+    /(?:don'?t|do\s+not|dnt)\s+(?:want|wanna)\s+to\s+(?:continue|go\s+on|live|keep\s+going)/i,
+    /(?:can'?t|cannot|cant)\s+(?:continue|go\s+on|take\s+this|do\s+this|last)/i,
+    /what'?s?\s+the\s+point/i,
+    /no\s+(?:point|reason|use|hope)/i,
+    /give\s+up|giving\s+up/i,
+    /leave\s+me\s+alone/i,
+    /stop\s+(?:talking|messaging|bothering)/i,
+    /(?:don'?t|won'?t)\s+call/i,
+    /nothing\s+(?:matters|helps|changes)/i,
+    /थक\s*(गया|गई|चुके|गए)/i,
+    /आगे\s*नहीं\s*बढ़\s*सक/i,
+    /जारी\s*नहीं/i,
+    /कोई\s*(फायदा|फ़ायदा|मतलब|उम्मीद)\s*नहीं/i,
+    /अकेला\s*छोड़\s*दो/i,
+    /नहीं\s*जीना/i,
+  ],
+  connection_seeking: [
+    /just\s+(?:talk|listen|hear\s+me)/i,
+    /talk\s+to\s+me/i,
+    /listen\s+to\s+me/i,
+    /why\s+won'?t\s+you/i,
+    /no\s+one\s+(?:cares|listens|understands)/i,
+    /nobody\s+(?:cares|listens|understands)/i,
+    /i\s+(?:have\s+)?no\s+one/i,
+    /all\s+alone/i,
+    /मेरी\s*सुनो|बात\s*करो|कोई\s*नहीं\s*समझता/i,
+  ],
+  calming_receptive: [
+    /^(?:ok|okay|k|alright|fine|i'?m\s+sitting|sitting\s+down|i\s+will\s+wait|breathing)[\s.!]?$/i,
+    /^(?:ठीक\s*है|बैठ\s*(?:गया|गई|रहा|रही)|रुक\s*(?:रहा|रही))[\s।!?]*$/i,
+  ],
+});
+
+/**
+ * Generate a context-aware, empathetic follow-up response for subsequent turns
+ * in an active crisis conversation.
+ *
+ * @param {object} params
+ * @param {Array<{ speaker: string, text: string }>} params.turns - check-in transcript
+ * @param {string} [params.locale] - 'en' or 'hi'
+ * @param {string} [params.category] - crisis category if known
+ * @returns {string} - tailored de-escalation message
+ */
+export function getOngoingCrisisResponse({ turns, locale = 'en', category } = {}) {
+  const effectiveLocale = locale === 'hi' ? 'hi' : 'en';
+  const templates = ONGOING_CRISIS_TEMPLATES[effectiveLocale] ?? ONGOING_CRISIS_TEMPLATES.en;
+
+  // Find the latest person turn
+  const lastPersonTurn = Array.isArray(turns)
+    ? [...turns].reverse().find((t) => t && t.speaker === 'person')
+    : null;
+  const text = (lastPersonTurn?.text ?? '').trim();
+
+  // Determine sub-state
+  let subState = 'general_ongoing';
+
+  for (const [state, patterns] of Object.entries(ONGOING_CRISIS_PATTERNS)) {
+    if (patterns.some((p) => p.test(text))) {
+      subState = state;
+      break;
+    }
+  }
+
+  const options = templates[subState] ?? templates.general_ongoing;
+
+  // Cycle options deterministically based on turns count and text length so consecutive
+  // turns in the same sub-state don't repeat.
+  const turnCount = Array.isArray(turns) ? turns.length : 1;
+  const index = (text.length + turnCount) % options.length;
+
+  return options[index];
+}

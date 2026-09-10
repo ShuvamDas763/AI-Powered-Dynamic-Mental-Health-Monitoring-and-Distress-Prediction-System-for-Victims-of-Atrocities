@@ -28,8 +28,9 @@
 
 import Groq from 'groq-sdk';
 import { config } from '../config/env.js';
-import { ANALYSIS_SYSTEM_PROMPT, buildAnalysisUserMessage, FOLLOW_UP_SYSTEM_PROMPT, MODERATION_SYSTEM_PROMPT } from './prompts.js';
+import { ANALYSIS_SYSTEM_PROMPT, buildAnalysisUserMessage, FOLLOW_UP_SYSTEM_PROMPT, CRISIS_FOLLOW_UP_SYSTEM_PROMPT, MODERATION_SYSTEM_PROMPT } from './prompts.js';
 import { detectSignalsInCheckIn } from '../safety/fallbackSignals.js';
+import { getOngoingCrisisResponse } from '../safety/crisisResponse.js';
 import { SIGNAL } from '../domain/escalation.js';
 
 /** A plausible but obviously-cached sentiment reading. */
@@ -398,6 +399,55 @@ export async function generateFollowUp(checkIn) {
 
   // When the LLM fails, use signal-aware templates rather than a one-size-fits-all default.
   return generateFallbackFollowUp(turns, locale);
+}
+
+/**
+ * Generate an empathetic, context-aware follow-up message during an ongoing crisis dialogue.
+ *
+ * Uses Groq with CRISIS_FOLLOW_UP_SYSTEM_PROMPT to de-escalate and validate the person's
+ * specific distress, falling back to deterministic ongoing crisis templates if offline or erroring.
+ *
+ * @param {{ turns: Array<{ speaker: string, text: string }>, locale?: string, category?: string }} params
+ * @returns {Promise<string>}
+ */
+export async function generateCrisisFollowUp({ turns, locale = 'en', category } = {}) {
+  const effectiveLocale = locale ?? 'en';
+  const turnsList = turns ?? [];
+
+  if (config.llm.forceFallback || !config.llm.apiKey) {
+    return getOngoingCrisisResponse({ turns: turnsList, locale: effectiveLocale, category });
+  }
+
+  // Include recent conversation turns for context
+  const recentTurns = turnsList.slice(-6);
+  const transcript = recentTurns
+    .map((t) => `${t.speaker === 'person' ? 'PERSON' : 'SERVICE'}: ${t.text}`)
+    .join('\n');
+
+  const messages = [
+    { role: 'system', content: CRISIS_FOLLOW_UP_SYSTEM_PROMPT },
+    {
+      role: 'user',
+      content: `Language: ${effectiveLocale}.\nCrisis Category: ${category ?? 'distress'}.\n\n--- RECENT CONVERSATION ---\n${transcript}\n--- END ---\n\nGenerate the next de-escalation message.`,
+    },
+  ];
+
+  const client = new Groq({ apiKey: config.llm.apiKey });
+
+  try {
+    const raw = await callGroq(client, config.llm.model, messages, config.llm.timeoutMs);
+    const parsed = safeParse(raw);
+    if (parsed && typeof parsed.message === 'string' && parsed.message.trim().length > 0) {
+      const result = await moderateText(parsed.message);
+      if (result.pass) {
+        return parsed.message.trim();
+      }
+    }
+  } catch {
+    // Model error / timeout — fall through to ongoing crisis template engine
+  }
+
+  return getOngoingCrisisResponse({ turns: turnsList, locale: effectiveLocale, category });
 }
 
 /**
