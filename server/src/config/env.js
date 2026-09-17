@@ -40,6 +40,20 @@ const groqApiKey = process.env.GROQ_API_KEY?.trim() ?? '';
 // unedited .env behaves the same as a missing one instead of failing at the
 // first API call with a confusing 401.
 const hasRealKey = groqApiKey !== '' && groqApiKey !== 'gsk_your_key_here';
+const isProduction = process.env.NODE_ENV === 'production';
+const sessionSecret = process.env.SESSION_SECRET || 'dev-only-insecure-session-secret';
+
+if (isProduction && (!process.env.SESSION_SECRET || process.env.SESSION_SECRET === 'dev-only-insecure-session-secret' || process.env.SESSION_SECRET.length < 16)) {
+  throw new Error(
+    '[FATAL] Production startup aborted: SESSION_SECRET must be set to a secure random string of at least 16 characters in production environments.'
+  );
+}
+
+// Configured client origin allowlist
+const rawOrigins = process.env.CLIENT_ORIGIN || '';
+const configuredOrigins = rawOrigins
+  ? rawOrigins.split(',').map((o) => o.trim()).filter(Boolean)
+  : ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000', 'http://localhost:3001'];
 
 export const config = Object.freeze({
   /**
@@ -52,7 +66,9 @@ export const config = Object.freeze({
    * name makes that collision impossible.
    */
   port: intFromEnv('API_PORT', 3001),
-  sessionSecret: process.env.SESSION_SECRET || 'dev-only-insecure-session-secret',
+  sessionSecret,
+  clientOrigins: Object.freeze(configuredOrigins),
+  isProduction,
 
   llm: Object.freeze({
     apiKey: hasRealKey ? groqApiKey : null,

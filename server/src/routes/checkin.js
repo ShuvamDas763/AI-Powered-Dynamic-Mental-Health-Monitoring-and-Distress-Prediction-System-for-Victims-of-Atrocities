@@ -99,6 +99,19 @@ checkinRouter.post('/', async (req, res) => {
   const crisisUrgency = patternCrisis.urgency || (analysis.surfaceSentiment >= 90 ? 'critical' : 'high');
   const crisisMatchedText = patternCrisis.matchedText || analysis.signalPhrases?.[0] || 'Semantic crisis evaluation';
 
+  // ── SERVER-AUTHORITATIVE CONSENT VERIFICATION ──────────────────────────
+  // Routine monitoring requires active server-side consent.
+  // Emergency life-safety crisis response triggers regardless of consent state.
+  const consentRecord = store.getConsent(caseId);
+  const isConsentActive = consentRecord && !consentRecord.revokedAt && consentRecord.purposes?.monitoring !== false;
+
+  if (!isConsentActive && !crisisTriggered) {
+    return res.status(403).json({
+      error: 'Active monitoring consent is required to submit routine check-ins. Please review and grant consent in settings.',
+      consentRequired: true,
+    });
+  }
+
   const crisisResult = {
     triggered: crisisTriggered,
     category: crisisCategory,
@@ -120,7 +133,7 @@ checkinRouter.post('/', async (req, res) => {
     signalPhrases: analysis.signalPhrases,
     immediateReviewRequested: crisisResult.triggered ? true : false,
     provenance: analysis.provenance.source,
-    consentAcknowledged: consentAcknowledged === true,
+    consentAcknowledged: Boolean(isConsentActive),
     crisisDetected: crisisResult.triggered,
     crisisMetadata: crisisResult.triggered ? {
       category: crisisResult.category,

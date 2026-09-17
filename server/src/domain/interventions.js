@@ -321,3 +321,101 @@ export function recommendInterventions(context) {
     (a, b) => (urgencyOrder[a.urgency] ?? 9) - (urgencyOrder[b.urgency] ?? 9),
   );
 }
+
+/**
+ * Closed-Loop Intervention Lifecycle States
+ */
+export const INTERVENTION_STATUS = Object.freeze({
+  RECOMMENDED: 'RECOMMENDED',
+  ACCEPTED: 'ACCEPTED',
+  ASSIGNED: 'ASSIGNED',
+  CONTACTED: 'CONTACTED',
+  FOLLOW_UP_DUE: 'FOLLOW_UP_DUE',
+  COMPLETED: 'COMPLETED',
+  DECLINED: 'DECLINED',
+  CLOSED: 'CLOSED',
+});
+
+/**
+ * Empirical Outcome Codes for Institutional Validation
+ */
+export const INTERVENTION_OUTCOME = Object.freeze({
+  ACCEPTED: 'accepted',
+  DECLINED: 'declined',
+  UNABLE_TO_CONTACT: 'unable_to_contact',
+  FOLLOW_UP_REQUIRED: 'follow_up_required',
+  SUPPORT_COMPLETED: 'support_completed',
+  FURTHER_ESCALATION_REQUIRED: 'further_escalation_required',
+});
+
+/**
+ * Valid state transitions table
+ */
+export const ALLOWED_TRANSITIONS = Object.freeze({
+  [INTERVENTION_STATUS.RECOMMENDED]: [
+    INTERVENTION_STATUS.ACCEPTED,
+    INTERVENTION_STATUS.DECLINED,
+  ],
+  [INTERVENTION_STATUS.ACCEPTED]: [
+    INTERVENTION_STATUS.ASSIGNED,
+    INTERVENTION_STATUS.DECLINED,
+  ],
+  [INTERVENTION_STATUS.ASSIGNED]: [
+    INTERVENTION_STATUS.CONTACTED,
+    INTERVENTION_STATUS.DECLINED,
+  ],
+  [INTERVENTION_STATUS.CONTACTED]: [
+    INTERVENTION_STATUS.FOLLOW_UP_DUE,
+    INTERVENTION_STATUS.COMPLETED,
+    INTERVENTION_STATUS.DECLINED,
+  ],
+  [INTERVENTION_STATUS.FOLLOW_UP_DUE]: [
+    INTERVENTION_STATUS.CONTACTED,
+    INTERVENTION_STATUS.COMPLETED,
+    INTERVENTION_STATUS.CLOSED,
+  ],
+  [INTERVENTION_STATUS.COMPLETED]: [
+    INTERVENTION_STATUS.CLOSED,
+    INTERVENTION_STATUS.FOLLOW_UP_DUE,
+  ],
+  [INTERVENTION_STATUS.DECLINED]: [
+    INTERVENTION_STATUS.CLOSED,
+    INTERVENTION_STATUS.RECOMMENDED,
+  ],
+  [INTERVENTION_STATUS.CLOSED]: [],
+});
+
+/**
+ * Transition an intervention record to a new lifecycle state.
+ *
+ * @param {object} item Existing intervention record
+ * @param {string} targetStatus Target INTERVENTION_STATUS
+ * @param {object} [options]
+ * @param {string} [options.assignedOfficer]
+ * @param {string} [options.outcomeNote]
+ * @param {string} [options.outcomeCode]
+ * @param {string} [options.dueAt]
+ * @returns {object} Updated intervention record
+ */
+export function transitionIntervention(item, targetStatus, options = {}) {
+  if (!item) throw new Error('Intervention item is required');
+  const currentStatus = item.status || INTERVENTION_STATUS.RECOMMENDED;
+
+  const allowed = ALLOWED_TRANSITIONS[currentStatus] || [];
+  if (!allowed.includes(targetStatus)) {
+    throw new Error(
+      `Invalid intervention lifecycle transition from ${currentStatus} to ${targetStatus}. Allowed: ${allowed.join(', ') || 'none'}`
+    );
+  }
+
+  const now = new Date().toISOString();
+  return {
+    ...item,
+    status: targetStatus,
+    assignedOfficer: options.assignedOfficer !== undefined ? options.assignedOfficer : item.assignedOfficer,
+    outcomeNote: options.outcomeNote !== undefined ? options.outcomeNote : item.outcomeNote,
+    outcomeCode: options.outcomeCode !== undefined ? options.outcomeCode : item.outcomeCode,
+    dueAt: options.dueAt !== undefined ? options.dueAt : item.dueAt,
+    updatedAt: now,
+  };
+}

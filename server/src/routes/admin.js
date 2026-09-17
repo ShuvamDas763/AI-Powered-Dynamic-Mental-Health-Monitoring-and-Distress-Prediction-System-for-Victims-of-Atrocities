@@ -41,6 +41,8 @@ function suppress(count) {
  */
 adminRouter.get('/summary', (req, res) => {
   const inputs = store.aggregateInputs();
+  const interventionStats = store.getInterventionStats();
+  const outreachStats = store.getAggregateOutreachStats();
 
   const total = inputs.length;
   const bandCounts = {};
@@ -58,13 +60,26 @@ adminRouter.get('/summary', (req, res) => {
     if (row.trendDirection === 'rising') risingCount++;
   }
 
+  const avgCheckIns =
+    total > 0
+      ? Math.round(inputs.reduce((sum, r) => sum + r.checkInCount, 0) / total)
+      : 0;
+
   res.json({
     total,
+    totalMonitoredCases: total,
     bandCounts,
     escalatedCount: suppress(escalatedCount),
+    activeAlerts: suppress(escalatedCount),
     risingTrendCount: suppress(risingCount),
-    // List of open alerts — count only, never individual cases.
-    alertCount: suppress(inputs.filter((r) => r.escalated).length),
+    risingTrajectories: suppress(risingCount),
+    alertCount: suppress(escalatedCount),
+    missedCheckInRate: `${outreachStats.missedCheckInRate}%`,
+    interventionBacklog: suppress(interventionStats.backlogCount),
+    overdueInterventions: suppress(interventionStats.overdueCount),
+    averageCheckInsPerCase: avgCheckIns,
+    supportCompletionRate: `${interventionStats.completionRate}%`,
+    suppressionThreshold: config.privacy.minCellSize,
   });
 });
 

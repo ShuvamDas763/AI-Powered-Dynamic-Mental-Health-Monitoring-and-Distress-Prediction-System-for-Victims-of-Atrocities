@@ -32,12 +32,23 @@ const STAGE_ICONS = {
   post_compensation: IconCheck,
 };
 
+const STATUS_LABELS = {
+  all: 'All Cases',
+  new: 'New',
+  under_review: 'Under Review',
+  contacted: 'Contacted',
+  assigned: 'Assigned',
+  follow_up_due: 'Follow-up Due',
+  resolved: 'Resolved',
+};
+
 export default function CounsellorDashboard({ onSelectCase, alertsOnly = false }) {
   const [cases, setCases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('score');
   const [filterBand, setFilterBand] = useState('all');
+  const [triageStatus, setTriageStatus] = useState('all');
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
@@ -77,6 +88,11 @@ export default function CounsellorDashboard({ onSelectCase, alertsOnly = false }
       }
     }
 
+    // Triage status filter
+    if (triageStatus !== 'all') {
+      result = result.filter(c => (c.counsellorStatus || 'new') === triageStatus);
+    }
+
     // Sort
     result.sort((a, b) => {
       switch (sortBy) {
@@ -89,7 +105,7 @@ export default function CounsellorDashboard({ onSelectCase, alertsOnly = false }
     });
 
     return result;
-  }, [cases, search, sortBy, filterBand]);
+  }, [cases, search, sortBy, filterBand, triageStatus]);
 
   if (loading) {
     return (
@@ -143,8 +159,8 @@ export default function CounsellorDashboard({ onSelectCase, alertsOnly = false }
     <div>
       <div className="page-header animate-in" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <h1>Case Queue</h1>
-          <p>Ranked by distress score and priority-use-case weighting.</p>
+          <h1>Counsellor Triage & Case Queue</h1>
+          <p>Human-in-the-loop triage ranked by distress trajectory, court dates, and priority weighting.</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', position: 'relative' }}>
           <button className="notification-bell" aria-label="Notifications">
@@ -162,18 +178,59 @@ export default function CounsellorDashboard({ onSelectCase, alertsOnly = false }
         </div>
         <div className="stat-card card-elevated">
           <div className="stat-value" style={{ color: 'var(--risk-high)' }}>{escalated.length}</div>
-          <div className="stat-label">Escalated</div>
+          <div className="stat-label">Escalated / Alerts</div>
         </div>
         <div className="stat-card card-elevated">
           <div className="stat-value" style={{ color: 'var(--risk-low)' }}>{stable.length}</div>
-          <div className="stat-label">Stable</div>
+          <div className="stat-label">Stable / Monitored</div>
         </div>
         <div className="stat-card card-elevated">
           <div className="stat-value">
             {cases.length > 0 ? Math.round(cases.reduce((s, c) => s + (c.assessment?.score ?? 0), 0) / cases.length) : 0}
           </div>
-          <div className="stat-label">Avg Score</div>
+          <div className="stat-label">Avg Distress Score</div>
         </div>
+      </div>
+
+      {/* Triage Status Queues Tabs */}
+      <div style={{ display: 'flex', gap: '0.4rem', overflowX: 'auto', paddingBottom: '0.5rem', marginBottom: '0.85rem' }} className="animate-in animate-in-delay-1">
+        {Object.entries(STATUS_LABELS).map(([key, label]) => {
+          const count = key === 'all'
+            ? cases.length
+            : cases.filter(c => (c.counsellorStatus || 'new') === key).length;
+          return (
+            <button
+              key={key}
+              onClick={() => setTriageStatus(key)}
+              style={{
+                padding: '0.35rem 0.85rem',
+                borderRadius: 'var(--radius-full)',
+                border: triageStatus === key ? '1.5px solid var(--accent)' : '1px solid var(--line)',
+                background: triageStatus === key ? 'var(--accent)' : 'var(--surface)',
+                color: triageStatus === key ? '#ffffff' : 'var(--ink-soft)',
+                fontSize: '0.78rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                transition: 'all var(--duration-fast)',
+              }}
+            >
+              <span>{label}</span>
+              <span style={{
+                fontSize: '0.7rem',
+                padding: '0.05rem 0.4rem',
+                borderRadius: 'var(--radius-full)',
+                background: triageStatus === key ? 'rgba(255,255,255,0.25)' : 'var(--surface-sunken)',
+                color: triageStatus === key ? '#ffffff' : 'var(--ink-muted)',
+              }}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Search and filter toolbar */}
@@ -255,6 +312,15 @@ function CaseCard({ row, onSelect, delay = 0, urgent = false }) {
   const bandColor = BAND_BORDER[assessment?.band] ?? 'var(--line)';
   const StageIcon = STAGE_ICONS[row.caseStage] ?? IconCase;
 
+  const statusColor = {
+    new: '#3182ce',
+    under_review: '#d69e2e',
+    contacted: '#319795',
+    assigned: '#805ad5',
+    follow_up_due: '#dd6b20',
+    resolved: '#38a169',
+  }[row.counsellorStatus || 'new'] || 'var(--ink-muted)';
+
   return (
     <div
       className="card card-elevated animate-in"
@@ -281,7 +347,20 @@ function CaseCard({ row, onSelect, delay = 0, urgent = false }) {
             <StageIcon size={20} />
           </div>
           <div>
-            <h3 style={{ margin: 0, fontSize: '1rem' }}>{row.pseudonym}</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1rem' }}>{row.pseudonym}</h3>
+              <span style={{
+                fontSize: '0.68rem',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                padding: '0.1rem 0.45rem',
+                borderRadius: 'var(--radius-full)',
+                border: `1px solid ${statusColor}`,
+                color: statusColor,
+              }}>
+                {STATUS_LABELS[row.counsellorStatus] || 'New'}
+              </span>
+            </div>
             <span style={{ fontSize: '0.78rem', color: 'var(--ink-muted)' }}>
               {row.caseId} · {row.district}
             </span>
@@ -289,6 +368,39 @@ function CaseCard({ row, onSelect, delay = 0, urgent = false }) {
         </div>
         <span className={`band-badge ${bandClass}`}>{assessment?.band}</span>
       </div>
+
+      {/* WHY THIS CASE IS HERE — Transparency Banner */}
+      {row.whyThisCaseIsHere && (
+        <div style={{
+          margin: '0 0 0.85rem',
+          padding: '0.55rem 0.75rem',
+          background: urgent ? 'rgba(186, 26, 26, 0.05)' : 'var(--surface-sunken)',
+          borderLeft: `3px solid ${urgent ? 'var(--risk-high)' : 'var(--accent)'}`,
+          borderRadius: 'var(--radius-xs)',
+          fontSize: '0.78rem',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.2rem' }}>
+            <span style={{ fontWeight: 700, color: urgent ? 'var(--risk-high)' : 'var(--accent)' }}>WHY THIS CASE IS HERE:</span>
+            <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{row.whyThisCaseIsHere.headline}</span>
+          </div>
+          {row.whyThisCaseIsHere.rationale && row.whyThisCaseIsHere.rationale.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.25rem' }}>
+              {row.whyThisCaseIsHere.rationale.map((r, i) => (
+                <span key={i} style={{
+                  fontSize: '0.7rem',
+                  background: 'var(--surface)',
+                  padding: '0.1rem 0.45rem',
+                  borderRadius: 'var(--radius-full)',
+                  color: 'var(--ink-soft)',
+                  border: '1px solid var(--line-faint)',
+                }}>
+                  • {r}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <p style={{ margin: '0 0 0.85rem', fontSize: '0.85rem', color: 'var(--ink-soft)', lineHeight: 1.5 }}>
         {row.contextNote}
@@ -311,8 +423,27 @@ function CaseCard({ row, onSelect, delay = 0, urgent = false }) {
         </div>
       </div>
 
+      {/* Operational Indicators: Next checkin & Interventions */}
+      <div style={{ marginTop: '0.75rem', paddingTop: '0.65rem', borderTop: '1px solid var(--line-faint)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', fontSize: '0.74rem' }}>
+        <span style={{ color: 'var(--ink-muted)' }}>
+          📅 Next check-in: <strong>{row.nextCheckInDate || 'Within 7 days'}</strong>
+        </span>
+        <div style={{ display: 'flex', gap: '0.35rem' }}>
+          {row.activeInterventionsCount > 0 && (
+            <span style={{ padding: '0.15rem 0.5rem', borderRadius: 'var(--radius-full)', background: 'var(--accent-pale)', color: 'var(--accent)', fontWeight: 600 }}>
+              {row.activeInterventionsCount} Active Action{row.activeInterventionsCount === 1 ? '' : 's'}
+            </span>
+          )}
+          {row.overdueInterventionsCount > 0 && (
+            <span style={{ padding: '0.15rem 0.5rem', borderRadius: 'var(--radius-full)', background: 'var(--risk-high-bg)', color: 'var(--risk-high)', fontWeight: 600 }}>
+              ⚠️ {row.overdueInterventionsCount} Overdue
+            </span>
+          )}
+        </div>
+      </div>
+
       {assessment?.escalated && assessment?.triggerReasons?.length > 0 && (
-        <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--line-faint)', display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+        <div style={{ marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
           {assessment.triggerReasons.map((r) => (
             <span key={r.code} style={{
               fontSize: '0.72rem', padding: '0.2rem 0.55rem', borderRadius: 'var(--radius-full)',
@@ -348,7 +479,44 @@ function AlertCard({ row, onSelect, delay = 0 }) {
             <span style={{ fontSize: '0.82rem', color: 'var(--ink-muted)' }}>
               Score {assessment?.score} → adjusted {assessment?.priorityAdjustedScore}
             </span>
+            <span style={{
+              fontSize: '0.68rem',
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              padding: '0.1rem 0.45rem',
+              borderRadius: 'var(--radius-full)',
+              background: 'var(--surface-sunken)',
+              color: 'var(--ink-soft)',
+            }}>
+              {STATUS_LABELS[row.counsellorStatus] || 'Triage Required'}
+            </span>
           </div>
+
+          {/* WHY THIS CASE IS HERE */}
+          {row.whyThisCaseIsHere && (
+            <div style={{
+              margin: '0.4rem 0 0.65rem',
+              padding: '0.5rem 0.75rem',
+              background: 'rgba(186, 26, 26, 0.06)',
+              borderLeft: '3px solid var(--risk-high)',
+              borderRadius: 'var(--radius-xs)',
+              fontSize: '0.78rem',
+            }}>
+              <div style={{ fontWeight: 700, color: 'var(--risk-high)', marginBottom: '0.2rem' }}>
+                🎯 WHY THIS CASE IS HERE: {row.whyThisCaseIsHere.headline}
+              </div>
+              {row.whyThisCaseIsHere.rationale && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
+                  {row.whyThisCaseIsHere.rationale.map((r, i) => (
+                    <span key={i} style={{ fontSize: '0.7rem', background: 'var(--surface)', padding: '0.1rem 0.4rem', borderRadius: 'var(--radius-full)', color: 'var(--ink-soft)' }}>
+                      • {r}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <p style={{ margin: '0 0 0.5rem', fontSize: '0.88rem', color: 'var(--ink-soft)' }}>
             {caseRecord.contextNote}
           </p>

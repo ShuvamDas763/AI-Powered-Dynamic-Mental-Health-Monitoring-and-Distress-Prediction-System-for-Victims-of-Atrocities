@@ -105,25 +105,42 @@ Run the full automated test suite:
 npm test
 ```
 
-Executes **328 tests across 61 test suites** via Node's native test runner (`node --test`), verifying access control boundaries, scoring arithmetic, crisis detection, fallback signal extraction, and longitudinal assessment pipelines without network dependency.
+Executes **347 tests across 66 test suites** via Node's native test runner (`node --test`), verifying access control boundaries, scoring arithmetic, crisis detection, early-warning trajectory projections, server-authoritative consent, multi-channel outreach state machines, closed-loop interventions, and multilingual providers without external network dependencies.
+
+### Technical Documentation
+
+Comprehensive architectural and methodological documentation is available in `docs/`:
+- [System Architecture](docs/architecture.md): 2-Tier Data Boundary, security hardening, repository interfaces.
+- [Early-Warning Methodology](docs/early-warning-methodology.md): Longitudinal velocity, bounded windows, evidence quality, and court date overlap.
+- [Consent & Privacy Framework](docs/consent-and-privacy.md): Server-authoritative consent, granular purposes, and k-anonymity suppression ($k < 5$).
+- [Outreach Orchestrator](docs/outreach.md): Multi-channel state machine (Web, App, SMS, IVRS) and non-punitive retry policies.
+- [Intervention Lifecycle Workflow](docs/intervention-workflow.md): Traceable closed-loop interventions from recommendation to documented outcome.
+- [Future Validation Roadmap](docs/future-validation.md): Non-clinical claims, ethical review, and institutional validation roadmap.
 
 ### API routes
 
-| Route | Tier | Description |
+| Route | Tier / Scope | Description |
 |---|---|---|
-| `GET /api/health` | Public | Liveness probe, LLM mode |
-| `POST /api/auth/login` | Public | Establish role session |
+| `GET /api/health` | Public | Liveness probe, LLM mode, origin status |
+| `POST /api/auth/login` | Public (Rate-limited) | Establish role session |
 | `POST /api/auth/logout` | Public | End session |
-| `GET /api/auth/me` | Public | Current user (or null) |
-| `POST /api/checkin` | Victim only (self-scoped) | Submit check-in, live LLM analysis |
+| `GET /api/auth/me` | Public | Current authenticated user |
+| `GET /api/consent` | Victim / Counsellor | Get server-authoritative consent record |
+| `POST /api/consent` | Victim / Counsellor | Grant or update consent purposes and channels |
+| `POST /api/consent/revoke` | Victim / Counsellor | Revoke consent with documented rationale |
+| `POST /api/checkin` | Victim (Rate-limited) | Submit check-in, live analysis, crisis safety |
 | `GET /api/checkin/prompts/:caseId` | Victim (self-scoped) | Check-in opening prompts, per-case locale |
 | `GET /api/notifications` | Victim (self-scoped) | Own notifications + unread count |
 | `POST /api/notifications/read` | Victim (self-scoped) | Mark own notifications read |
-| `GET /api/counsellor/cases` | Tier 1 | Prioritised case queue |
-| `GET /api/counsellor/cases/:id` | Tier 1 | Case detail + history + trend |
-| `GET /api/counsellor/alerts` | Tier 1 | Escalated cases |
-| `GET /api/admin/summary` | Tier 2 | Headline counts |
-| `GET /api/admin/trends` | Tier 2 | Band distribution, trend directions |
+| `GET /api/outreach/:caseId` | Counsellor / System | View outreach schedule and delivery state |
+| `POST /api/outreach/schedule` | Counsellor / System | Schedule multi-channel outreach |
+| `GET /api/counsellor/cases` | Tier 1 | Prioritised case queue with triage status & WHY banners |
+| `GET /api/counsellor/cases/:id` | Tier 1 | Case detail, trajectory, lifecycle, and history |
+| `GET /api/counsellor/alerts` | Tier 1 | Escalated cases requiring immediate review |
+| `GET /api/counsellor/cases/:caseId/interventions` | Tier 1 | List closed-loop support interventions |
+| `POST /api/counsellor/cases/:caseId/interventions/:id/action` | Tier 1 | Execute intervention lifecycle state transition |
+| `GET /api/admin/summary` | Tier 2 | Headline counts, operational backlog, resolution rate |
+| `GET /api/admin/trends` | Tier 2 | Band distribution, trend directions with $k < 5$ suppression |
 | `GET /api/admin/geography` | Tier 2 | Geographic breakdown (national/state/district) |
 | `GET /api/export/cases.csv` | Tier 1 | Per-case export (CSV) |
 | `GET /api/export/summary` | Tier 2 | Aggregate summary export (text report) |

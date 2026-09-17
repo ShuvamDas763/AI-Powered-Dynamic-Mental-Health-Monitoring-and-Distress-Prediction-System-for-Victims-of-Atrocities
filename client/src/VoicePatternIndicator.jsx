@@ -18,7 +18,7 @@ import { recordCheckin, getBaseline } from './voiceBaseline.js';
 
 const RECORD_SECONDS = 12;
 
-export default function VoicePatternIndicator({ caseId, enabled = true }) {
+export default function VoicePatternIndicator({ caseId, enabled = true, hasVoiceConsent = false, onRequestConsent }) {
   const [recording, setRecording] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState(null);
@@ -26,6 +26,12 @@ export default function VoicePatternIndicator({ caseId, enabled = true }) {
   const abortRef = useRef(null);
 
   const handleToggle = useCallback(async () => {
+    if (!hasVoiceConsent) {
+      if (onRequestConsent) onRequestConsent();
+      setError('Voice analysis requires explicit voluntary consent. Please enable voice consent in Consent Settings.');
+      return;
+    }
+
     if (recording) {
       // Stop recording — the interval in captureAudio will resolve naturally.
       setRecording(false);
@@ -70,14 +76,14 @@ export default function VoicePatternIndicator({ caseId, enabled = true }) {
     }
 
     setAnalyzing(false);
-  }, [recording, caseId]);
+  }, [recording, caseId, hasVoiceConsent, onRequestConsent]);
 
   if (!enabled) return null;
 
   return (
     <div style={{
-      padding: '0.65rem 0.85rem',
-      margin: '0.5rem 0',
+      padding: '0.75rem 0.95rem',
+      margin: '0.65rem 0',
       background: 'var(--surface)',
       border: '1px solid var(--line-faint)',
       borderRadius: 'var(--radius)',
@@ -92,19 +98,19 @@ export default function VoicePatternIndicator({ caseId, enabled = true }) {
         marginBottom: '0.35rem',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <span style={{ fontSize: '0.85rem' }}>🎙</span>
-          <span style={{ fontWeight: 600, color: 'var(--ink-soft)', fontSize: '0.78rem' }}>
-            Acoustic pattern
+          <span style={{ fontSize: '0.95rem' }}>🎙</span>
+          <span style={{ fontWeight: 600, color: 'var(--ink)', fontSize: '0.82rem' }}>
+            Acoustic Pattern Check
           </span>
           <span style={{
             fontSize: '0.68rem',
             padding: '0.1rem 0.4rem',
             borderRadius: 'var(--radius-full)',
-            background: 'var(--surface-sunken)',
-            color: 'var(--ink-muted)',
-            fontWeight: 500,
+            background: hasVoiceConsent ? 'var(--accent-pale)' : 'var(--surface-sunken)',
+            color: hasVoiceConsent ? 'var(--accent)' : 'var(--ink-muted)',
+            fontWeight: 600,
           }}>
-            optional
+            {hasVoiceConsent ? 'Consented' : 'Consent needed'}
           </span>
         </div>
 
@@ -114,9 +120,9 @@ export default function VoicePatternIndicator({ caseId, enabled = true }) {
           style={{
             padding: '0.25rem 0.65rem',
             borderRadius: 'var(--radius-full)',
-            border: recording ? '1.5px solid var(--risk-elevated)' : '1.5px solid var(--line)',
-            background: recording ? 'var(--risk-elevated-bg)' : 'transparent',
-            color: recording ? 'var(--risk-elevated)' : 'var(--ink-muted)',
+            border: recording ? '1.5px solid var(--risk-elevated)' : hasVoiceConsent ? '1.5px solid var(--accent)' : '1.5px solid var(--line)',
+            background: recording ? 'var(--risk-elevated-bg)' : hasVoiceConsent ? 'var(--accent-pale)' : 'transparent',
+            color: recording ? 'var(--risk-elevated)' : hasVoiceConsent ? 'var(--accent)' : 'var(--ink-muted)',
             fontSize: '0.75rem',
             fontWeight: 600,
             cursor: analyzing ? 'not-allowed' : 'pointer',
@@ -125,7 +131,7 @@ export default function VoicePatternIndicator({ caseId, enabled = true }) {
             opacity: analyzing ? 0.5 : 1,
           }}
         >
-          {recording ? '⏹ Stop' : analyzing ? 'Analysing…' : '🎙 Record voice'}
+          {recording ? '⏹ Stop' : analyzing ? 'Analysing…' : hasVoiceConsent ? '🎙 Record voice' : 'Enable voice'}
         </button>
       </div>
 

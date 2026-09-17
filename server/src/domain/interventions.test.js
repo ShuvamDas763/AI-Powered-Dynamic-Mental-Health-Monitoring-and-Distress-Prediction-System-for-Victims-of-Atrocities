@@ -232,3 +232,71 @@ describe('recommendInterventions', () => {
     assert.ok(result.length > 0);
   });
 });
+
+describe('Closed-Loop Intervention Lifecycle & Outcomes', () => {
+  test('valid lifecycle progression: RECOMMENDED -> ACCEPTED -> ASSIGNED -> CONTACTED -> FOLLOW_UP_DUE -> COMPLETED -> CLOSED', async () => {
+    const { INTERVENTION_STATUS, INTERVENTION_OUTCOME, transitionIntervention } = await import('./interventions.js');
+
+    let intv = {
+      id: 'intv-01',
+      caseId: 'SIH-CASE-0001',
+      code: 'counselling_referral',
+      status: INTERVENTION_STATUS.RECOMMENDED,
+    };
+
+    // Accept
+    intv = transitionIntervention(intv, INTERVENTION_STATUS.ACCEPTED);
+    assert.equal(intv.status, INTERVENTION_STATUS.ACCEPTED);
+
+    // Assign
+    intv = transitionIntervention(intv, INTERVENTION_STATUS.ASSIGNED, {
+      assignedOfficer: 'Officer Sharma (DLSA)',
+      dueAt: '2026-09-25T10:00:00.000Z',
+    });
+    assert.equal(intv.status, INTERVENTION_STATUS.ASSIGNED);
+    assert.equal(intv.assignedOfficer, 'Officer Sharma (DLSA)');
+
+    // Contact
+    intv = transitionIntervention(intv, INTERVENTION_STATUS.CONTACTED, {
+      outcomeNote: 'Spoke with complainant. Informed about legal aid desk.',
+    });
+    assert.equal(intv.status, INTERVENTION_STATUS.CONTACTED);
+
+    // Follow-up due
+    intv = transitionIntervention(intv, INTERVENTION_STATUS.FOLLOW_UP_DUE, {
+      outcomeCode: INTERVENTION_OUTCOME.FOLLOW_UP_REQUIRED,
+    });
+    assert.equal(intv.status, INTERVENTION_STATUS.FOLLOW_UP_DUE);
+    assert.equal(intv.outcomeCode, 'follow_up_required');
+
+    // Complete
+    intv = transitionIntervention(intv, INTERVENTION_STATUS.COMPLETED, {
+      outcomeCode: INTERVENTION_OUTCOME.SUPPORT_COMPLETED,
+      outcomeNote: 'Counselling referral successfully connected.',
+    });
+    assert.equal(intv.status, INTERVENTION_STATUS.COMPLETED);
+
+    // Close
+    intv = transitionIntervention(intv, INTERVENTION_STATUS.CLOSED);
+    assert.equal(intv.status, INTERVENTION_STATUS.CLOSED);
+  });
+
+  test('rejects invalid state transitions', async () => {
+    const { INTERVENTION_STATUS, transitionIntervention } = await import('./interventions.js');
+
+    const intv = {
+      id: 'intv-02',
+      status: INTERVENTION_STATUS.RECOMMENDED,
+    };
+
+    assert.throws(
+      () => transitionIntervention(intv, INTERVENTION_STATUS.COMPLETED),
+      /Invalid intervention lifecycle transition/,
+    );
+
+    assert.throws(
+      () => transitionIntervention(intv, INTERVENTION_STATUS.CLOSED),
+      /Invalid intervention lifecycle transition/,
+    );
+  });
+});

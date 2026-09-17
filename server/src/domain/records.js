@@ -315,6 +315,14 @@ export function makeAssessment(raw, options = {}) {
     /** Everything the UI needs to justify the number to the person it is about. */
     explanation: Object.freeze({
       headline: typeof explanation.headline === 'string' ? explanation.headline : '',
+      disclaimer: typeof explanation.disclaimer === 'string' ? explanation.disclaimer : 'Support/triage indicator — not a diagnosis.',
+      evidenceQuality: explanation.evidenceQuality ?? 'moderate',
+      observationCount: explanation.observationCount ?? 0,
+      observationWindowDays: explanation.observationWindowDays ?? 0,
+      lastCheckInAt: explanation.lastCheckInAt ?? null,
+      missingCheckIns: explanation.missingCheckIns ?? 0,
+      channelMix: Object.freeze(Array.isArray(explanation.channelMix) ? [...explanation.channelMix] : []),
+      language: explanation.language ?? 'en',
       drivers: Object.freeze(Array.isArray(explanation.drivers) ? [...explanation.drivers] : []),
       signalPhrases: Object.freeze(
         Array.isArray(explanation.signalPhrases) ? [...explanation.signalPhrases] : [],

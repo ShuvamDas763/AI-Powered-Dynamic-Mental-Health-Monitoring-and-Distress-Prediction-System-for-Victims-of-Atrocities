@@ -255,10 +255,11 @@ function assessPrefix(caseRecord, prefix, options) {
     signals,
   });
 
-  // Prediction: extrapolate current trajectory to estimate time to escalation.
+  // Early-Warning Trajectory: project trajectory using actual check-in history.
   const prediction = predictEscalation(
     { score, trend: { ...trend, points: readings.length } },
     caseRecord,
+    prefix,
   );
 
   // Emotion detection: identify discrete emotions from the latest check-in.
@@ -282,6 +283,14 @@ function assessPrefix(caseRecord, prefix, options) {
     interventions,
     explanation: {
       headline: `${BAND_LABELS[band]} support signal at this check-in. Largest contributor: ${drivers[0].label.toLowerCase()}.`,
+      disclaimer: 'Support/triage indicator — not a diagnosis.',
+      evidenceQuality: prediction.evidenceQuality || 'moderate',
+      observationCount: prediction.observations || prefix.length,
+      observationWindowDays: prediction.observationWindowDays || 0,
+      lastCheckInAt: latest.occurredAt || null,
+      missingCheckIns: prefix.filter((c) => c.status === 'missed').length,
+      channelMix: [...new Set(prefix.map((c) => c.channel).filter(Boolean))],
+      language: latest.locale || caseRecord?.preferredLocale || 'en',
       drivers,
       signalPhrases: collectRecentPhrases(prefix),
     },

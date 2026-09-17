@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { api } from './api.js';
 import VoicePatternIndicator from './VoicePatternIndicator.jsx';
-import { IconChat } from './GovernmentBranding.jsx';
+import { IconChat, IconAlert, IconCheck, IconClock } from './GovernmentBranding.jsx';
 
 const CASES = [
   { caseId: 'SIH-CASE-0001', label: 'Complainant A', desc: 'Hindi · Investigation · Rising distress', locale: 'hi' },
@@ -18,9 +18,8 @@ const CHANNELS = [
   { id: 'app', label: 'App' },
   { id: 'sms', label: 'SMS' },
   { id: 'ivrs', label: 'IVRS' },
+  { id: 'web', label: 'Web' },
 ];
-
-const CONSENT_KEY = 'freebuff_consent';
 
 const INITIAL_PROMPTS_EN = 'How have things been since we last checked in?';
 const INITIAL_PROMPTS_HI = 'पिछली बार बात होने के बाद से चीज़ें कैसी रहीं?';
@@ -39,12 +38,14 @@ export default function CheckinChat({ user }) {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [channel, setChannel] = useState('app');
-  const [lastAssessment, setLastAssessment] = useState(null);
-  const [consentGiven, setConsentGiven] = useState(false);
+  const [consentRecord, setConsentRecord] = useState(null);
+  const [showConsentModal, setShowConsentModal] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
   const [crisisActive, setCrisisActive] = useState(false);
+  const [camouflaged, setCamouflaged] = useState(false);
+  const [lastSubmittedAt, setLastSubmittedAt] = useState(null);
   const messagesEnd = useRef(null);
 
   const fetchNotifications = useCallback(async () => {
@@ -69,17 +70,33 @@ export default function CheckinChat({ user }) {
     } catch { /* ignore */ }
   }
 
-  useEffect(() => {
-    if (!selectedCase) return;
+  // Load server-authoritative consent
+  const fetchConsent = useCallback(async (caseId) => {
+    if (!caseId) return;
     try {
-      const stored = JSON.parse(localStorage.getItem(CONSENT_KEY) ?? '{}');
-      setConsentGiven(stored[selectedCase] === true);
-    } catch { setConsentGiven(false); }
-  }, [selectedCase]);
+      const { ok, body } = await api(`/consent?caseId=${caseId}`);
+      if (ok && body.consent) {
+        setConsentRecord(body.consent);
+        if (body.consent.channels && body.consent.channels.length > 0) {
+          if (body.consent.channels.includes(channel)) {
+            // Keep active
+          } else {
+            setChannel(body.consent.channels[0]);
+          }
+        }
+      }
+    } catch { /* ignore */ }
+  }, [channel]);
+
+  useEffect(() => {
+    if (selectedCase) {
+      fetchConsent(selectedCase);
+    }
+  }, [selectedCase, fetchConsent]);
 
   const availableCases = user?.caseId
     ? CASES.filter((c) => c.caseId === user.caseId)
-    : [];
+    : CASES;
 
   useEffect(() => {
     messagesEnd.current?.scrollIntoView({ behavior: 'smooth' });
@@ -90,13 +107,47 @@ export default function CheckinChat({ user }) {
     setSelectedCase(caseId);
     setLocale(c?.locale ?? 'en');
     setMessages([]);
-    setLastAssessment(null);
     setCrisisActive(false);
+    setLastSubmittedAt(null);
 
     const initialPrompt = c?.locale === 'hi' ? INITIAL_PROMPTS_HI : INITIAL_PROMPTS_EN;
     setTimeout(() => {
       setMessages([{ speaker: 'system', text: initialPrompt, time: new Date().toISOString() }]);
     }, 500);
+  }
+
+  async function updateConsent(purposes, channels) {
+    if (!selectedCase) return;
+    try {
+      const { ok, body } = await api('/consent', {
+        method: 'POST',
+        body: JSON.stringify({
+          caseId: selectedCase,
+          purposes,
+          channels: channels || [channel],
+        }),
+      });
+      if (ok && body.consent) {
+        setConsentRecord(body.consent);
+      }
+    } catch { /* ignore */ }
+  }
+
+  async function revokeConsent() {
+    if (!selectedCase) return;
+    try {
+      const { ok, body } = await api('/consent/revoke', {
+        method: 'POST',
+        body: JSON.stringify({
+          caseId: selectedCase,
+          reason: 'Victim requested consent revocation through portal',
+        }),
+      });
+      if (ok && body.consent) {
+        setConsentRecord(body.consent);
+        setShowConsentModal(false);
+      }
+    } catch { /* ignore */ }
   }
 
   async function sendReply() {
@@ -109,6 +160,8 @@ export default function CheckinChat({ user }) {
     setMessages(newMessages);
     setBusy(true);
 
+    const hasConsent = consentRecord?.status === 'active' && consentRecord?.purposes?.includes('monitoring');
+
     try {
       const { ok, body } = await api('/checkin', {
         method: 'POST',
@@ -117,13 +170,11 @@ export default function CheckinChat({ user }) {
           turns: newMessages.map(({ speaker, text }) => ({ speaker, text })),
           locale,
           channel,
-          consentAcknowledged: consentGiven,
+          consentAcknowledged: hasConsent,
         }),
       });
 
-      if (ok && body.assessment) {
-        setLastAssessment(body.assessment);
-      }
+      setLastSubmittedAt(new Date().toISOString());
 
       const isCrisis = Boolean(body.crisisResponse?.triggered || body.assessment?.crisisDetected);
       if (isCrisis) {
@@ -147,7 +198,7 @@ export default function CheckinChat({ user }) {
     } catch {
       setMessages((prev) => [
         ...prev,
-        { speaker: 'system', text: 'Something went wrong. Please try again.', time: new Date().toISOString() },
+        { speaker: 'system', text: locale === 'hi' ? 'कुछ गड़बड़ हुई। कृपया पुनः प्रयास करें।' : 'Something went wrong. Please try again.', time: new Date().toISOString() },
       ]);
     }
 
@@ -161,14 +212,42 @@ export default function CheckinChat({ user }) {
     }
   }
 
+  // Camouflage Mode: instantly disguises screen as a weather bulletin
+  if (camouflaged) {
+    return (
+      <div className="card" style={{ maxWidth: '42rem', margin: '2rem auto', padding: '2rem', animation: 'fadeIn 0.2s var(--ease-out)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--line-faint)', paddingBottom: '1rem', marginBottom: '1.25rem' }}>
+          <div>
+            <h2 style={{ fontSize: '1.2rem', margin: '0 0 0.25rem' }}>National Agro-Meteorological Weather Advisory</h2>
+            <span style={{ fontSize: '0.82rem', color: 'var(--ink-muted)' }}>India Meteorological Department (IMD) · Agro Bulletin</span>
+          </div>
+          <span style={{ fontSize: '1.8rem' }}>⛅</span>
+        </div>
+        <div style={{ background: 'var(--surface-sunken)', padding: '1rem', borderRadius: 'var(--radius)', fontSize: '0.88rem', lineHeight: 1.6 }}>
+          <p style={{ margin: '0 0 0.5rem' }}><strong>Regional Agro Bulletin:</strong> Normal rainfall distribution expected across the sub-district zone. Relative humidity 62%.</p>
+          <p style={{ margin: 0, color: 'var(--ink-muted)' }}>Farmers are advised to maintain drain channels in standing Kharif crops to prevent temporary waterlogging.</p>
+        </div>
+        <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            className="btn btn-ghost"
+            style={{ fontSize: '0.85rem' }}
+            onClick={() => setCamouflaged(false)}
+          >
+            ↺ Refresh Advisory
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Case selection screen
   if (!selectedCase) {
     return (
       <div>
         <div className="page-header animate-in" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <h1>Check-in</h1>
-            <p>Submit a well-being check-in. Your responses are reviewed by a welfare officer.</p>
+            <h1>Well-being Check-in</h1>
+            <p>Connect with your designated welfare officer for periodic support and protective assistance.</p>
           </div>
           <div style={{ position: 'relative' }}>
             <button
@@ -207,9 +286,9 @@ export default function CheckinChat({ user }) {
         </div>
 
         <div className="card card-elevated animate-in animate-in-delay-1" style={{ maxWidth: '48rem' }}>
-          <h2 style={{ fontSize: '1.05rem', margin: '0 0 0.5rem' }}>Select a case</h2>
+          <h2 style={{ fontSize: '1.05rem', margin: '0 0 0.5rem' }}>Select your case record</h2>
           <p style={{ color: 'var(--ink-soft)', margin: '0 0 1.25rem', fontSize: '0.9rem' }}>
-            Submit your well-being check-in below.
+            Choose your case profile to start your confidential dialogue.
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.75rem' }}>
             {availableCases.map((c, i) => (
@@ -237,23 +316,75 @@ export default function CheckinChat({ user }) {
     );
   }
 
+  const isConsentRevoked = consentRecord?.status === 'revoked';
+  const hasVoiceConsent = consentRecord?.status === 'active' && consentRecord?.purposes?.includes('voice_analysis');
+
   // Chat interface
   return (
     <div className="checkin-layout">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
         <button
           className="back-link animate-in"
-          onClick={() => { setSelectedCase(null); setMessages([]); setLastAssessment(null); setCrisisActive(false); }}
+          onClick={() => { setSelectedCase(null); setMessages([]); setCrisisActive(false); }}
         >
           &larr; Change case
         </button>
-        <span style={{ fontSize: '0.82rem', color: 'var(--ink-muted)' }}>
-          Active Case: <strong style={{ color: 'var(--ink)' }}>{selectedCase}</strong> · {locale === 'hi' ? 'हिंदी सत्र' : 'English Session'}
-        </span>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button
+            onClick={() => setCamouflaged(true)}
+            title="Instantly switch to neutral weather screen for privacy and safety"
+            style={{
+              background: 'var(--surface-sunken)',
+              border: '1px solid var(--line)',
+              color: 'var(--ink-muted)',
+              padding: '0.35rem 0.75rem',
+              borderRadius: 'var(--radius-full)',
+              fontSize: '0.78rem',
+              cursor: 'pointer',
+              fontWeight: 500,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+            }}
+          >
+            🛡️ Safe Exit
+          </button>
+          <span style={{ fontSize: '0.82rem', color: 'var(--ink-muted)' }}>
+            Active Case: <strong style={{ color: 'var(--ink)' }}>{selectedCase}</strong> · {locale === 'hi' ? 'हिंदी' : 'English'}
+          </span>
+        </div>
       </div>
 
+      {isConsentRevoked && (
+        <div style={{
+          padding: '0.75rem 1rem',
+          background: 'var(--risk-moderate-bg)',
+          borderLeft: '4px solid var(--risk-moderate)',
+          borderRadius: 'var(--radius-sm)',
+          marginBottom: '1rem',
+          fontSize: '0.85rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.5rem',
+        }}>
+          <div>
+            <strong>Monitoring Consent Paused:</strong> You previously revoked routine well-being monitoring. Duty-of-care emergency support remains active.
+          </div>
+          <button
+            className="btn btn-sm"
+            onClick={() => updateConsent(['monitoring', 'communication', 'voice_analysis'], [channel])}
+            style={{ fontSize: '0.78rem', padding: '0.25rem 0.65rem' }}
+          >
+            Resume Monitoring
+          </button>
+        </div>
+      )}
+
       <div className="checkin-grid animate-in animate-in-delay-1">
-        {/* Left column: The Chat Interface */}
+        {/* Left column: Dignified Chat Interface */}
         <div className="checkin-chat-col">
           <div className="chat-container">
             {/* Header */}
@@ -266,17 +397,17 @@ export default function CheckinChat({ user }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                     <strong style={{ fontSize: '0.94rem' }}>{selectedCase}</strong>
                     <span style={{ fontSize: '0.72rem', padding: '0.15rem 0.55rem', borderRadius: 'var(--radius-full)', background: 'var(--accent-pale)', color: 'var(--accent)', fontWeight: 600 }}>
-                      {channel.toUpperCase()}
+                      {channel.toUpperCase()} CHANNEL
                     </span>
                   </div>
                   <span style={{ fontSize: '0.78rem', color: 'var(--ink-muted)' }}>
-                    {locale === 'hi' ? 'दैनिक संबल एवं कल्याण संवाद' : 'Daily Well-being Check-in'}
+                    {locale === 'hi' ? 'दैनिक संबल एवं कल्याण संवाद' : 'Confidential Well-being Dialogue'}
                   </span>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span style={{ fontSize: '0.74rem', color: 'var(--ink-muted)', padding: '0.2rem 0.65rem', background: 'var(--surface-sunken)', borderRadius: 'var(--radius-full)', fontWeight: 500 }}>
-                  {messages.filter((m) => m.speaker === 'person').length} responses
+                  {messages.filter((m) => m.speaker === 'person').length} check-in entries
                 </span>
               </div>
             </div>
@@ -353,37 +484,33 @@ export default function CheckinChat({ user }) {
                       <span className="typing-dot" style={{ animationDelay: '0.15s' }}>●</span>
                       <span className="typing-dot" style={{ animationDelay: '0.3s' }}>●</span>
                     </span>
-                    {' '}Analysing response & checking well-being...
+                    {' '}Recording your check-in securely...
                   </div>
                 </div>
               )}
               <div ref={messagesEnd} />
             </div>
 
-            {/* Quick crisis de-escalation chips (anchored directly above input) */}
-            {crisisActive && (
-              <div className="crisis-chips-row">
-                <span style={{ fontSize: '0.74rem', color: 'var(--ink-muted)', alignSelf: 'center', fontWeight: 600, flexShrink: 0 }}>
-                  {locale === 'hi' ? 'त्वरित उत्तर:' : 'Quick reply:'}
-                </span>
-                {(locale === 'hi'
-                  ? ['मैं अभी सुरक्षित जगह पर हूँ', 'मुझे बस कोई सुनने वाला चाहिए', 'मैं बहुत थका हुआ महसूस कर रहा हूँ']
-                  : ["I'm in a safe place right now", 'I just need someone to listen', "I'm feeling completely exhausted"]
-                ).map((chipText) => (
-                  <button
-                    key={chipText}
-                    type="button"
-                    className="crisis-chip-btn"
-                    disabled={busy}
-                    onClick={() => {
-                      setInput(chipText);
-                    }}
-                  >
-                    {chipText}
-                  </button>
-                ))}
-              </div>
-            )}
+            {/* Quick response chips */}
+            <div className="crisis-chips-row">
+              <span style={{ fontSize: '0.74rem', color: 'var(--ink-muted)', alignSelf: 'center', fontWeight: 600, flexShrink: 0 }}>
+                {locale === 'hi' ? 'त्वरित उत्तर:' : 'Quick thoughts:'}
+              </span>
+              {(locale === 'hi'
+                ? ['आज थोड़ा बेहतर लग रहा है', 'मैं सुरक्षित जगह पर हूँ', 'मुझे परामर्शदाता से बात करनी है']
+                : ["Feeling a bit better today", "I'm in a safe place", "I would like to speak with my counsellor"]
+              ).map((chipText) => (
+                <button
+                  key={chipText}
+                  type="button"
+                  className="crisis-chip-btn"
+                  disabled={busy}
+                  onClick={() => setInput(chipText)}
+                >
+                  {chipText}
+                </button>
+              ))}
+            </div>
 
             {/* Input */}
             <div className="chat-input-row">
@@ -392,7 +519,7 @@ export default function CheckinChat({ user }) {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={locale === 'hi' ? 'अपना जवाब लिखें...' : 'Type your reply...'}
+                placeholder={locale === 'hi' ? 'अपनी बात यहाँ लिखें...' : 'Type your message at your own pace...'}
                 disabled={busy}
                 aria-label={locale === 'hi' ? 'अपना जवाब टाइप करें' : 'Type your reply'}
               />
@@ -400,46 +527,69 @@ export default function CheckinChat({ user }) {
                 {locale === 'hi' ? 'भेजें' : 'Send'}
               </button>
             </div>
+
+            <div style={{ marginTop: '0.5rem', fontSize: '0.72rem', color: 'var(--ink-faint)', textAlign: 'center' }}>
+              🔒 Confidential & Protected under SC/ST (PoA) Act · Reviewed by your designated welfare officer
+            </div>
           </div>
         </div>
 
-        {/* Right column: Monitoring, Voice & Check-in Controls */}
+        {/* Right column: Supportive Care & Rights Suite */}
         <div className="checkin-sidebar-col">
-          {/* Assessment summary — transparent scoring panel */}
-          {lastAssessment ? (
-            <AssessmentPanel assessment={lastAssessment} />
-          ) : (
-            <div className="card" style={{ padding: '1.25rem', background: 'var(--surface-sunken)', border: '1.5px dashed var(--line-strong)', borderRadius: 'var(--radius)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.65rem' }}>
-                <span style={{ fontSize: '1.2rem' }}>🛡️</span>
-                <strong style={{ fontSize: '0.92rem', color: 'var(--ink)' }}>Live Distress Monitoring</strong>
-              </div>
-              <p style={{ margin: '0 0 0.5rem', fontSize: '0.82rem', color: 'var(--ink-soft)', lineHeight: 1.5 }}>
-                {locale === 'hi'
-                  ? 'जैसे ही आप चेक-इन संदेश भेजेंगे, सिस्टम लाइव संकट स्कोर और स्पष्टीकरण प्रस्तुत करेगा।'
-                  : 'As you chat, the AI dynamically computes a distress score, emotional signals, and trajectory indicators.'}
-              </p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.74rem', color: 'var(--ink-muted)' }}>
-                <span>🔒 Confidential & Triage-only</span>
-              </div>
+          {/* Supportive Care Status Card */}
+          <div className="card" style={{ padding: '1rem 1.15rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.65rem' }}>
+              <span style={{ fontSize: '1.2rem' }}>🌿</span>
+              <strong style={{ fontSize: '0.94rem', color: 'var(--ink)' }}>Your Supportive Care Plan</strong>
             </div>
-          )}
 
-          {/* Voice pattern */}
-          <VoicePatternIndicator caseId={selectedCase} enabled={channel === 'app'} />
+            <p style={{ margin: '0 0 0.85rem', fontSize: '0.82rem', color: 'var(--ink-soft)', lineHeight: 1.5 }}>
+              You are enrolled in active well-being monitoring under the District SC/ST Welfare Cell.
+              Your entries are reviewed by your assigned welfare officer to ensure timely support and safety.
+            </p>
 
-          {/* Channel selector */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', fontSize: '0.8rem', background: 'var(--surface-sunken)', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-sm)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--ink-muted)' }}>Cadence:</span>
+                <strong>Weekly check-in schedule</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--ink-muted)' }}>Assigned Unit:</span>
+                <strong>District Atrocity Welfare Cell</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--ink-muted)' }}>Next Scheduled:</span>
+                <span style={{ color: 'var(--accent)', fontWeight: 600 }}>Active window</span>
+              </div>
+              {lastSubmittedAt && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--line)', paddingTop: '0.35rem', marginTop: '0.2rem' }}>
+                  <span style={{ color: 'var(--ink-muted)' }}>Last Check-in:</span>
+                  <span style={{ color: 'var(--risk-low)', fontWeight: 600 }}>✓ Logged {formatTime(lastSubmittedAt)}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Preferred Communication Channel */}
           <div className="card" style={{ padding: '0.85rem 1rem' }}>
-            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--ink-soft)', marginBottom: '0.45rem' }}>
-              Check-in Channel
+            <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--ink)', marginBottom: '0.45rem' }}>
+              Preferred Outreach Channel
             </div>
+            <p style={{ fontSize: '0.76rem', color: 'var(--ink-muted)', margin: '0 0 0.6rem', lineHeight: 1.4 }}>
+              Choose how you prefer Sahara to send you gentle check-in reminders:
+            </p>
             <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
               {CHANNELS.map((ch) => (
                 <button
                   key={ch.id}
-                  onClick={() => setChannel(ch.id)}
+                  onClick={() => {
+                    setChannel(ch.id);
+                    if (consentRecord?.status === 'active') {
+                      updateConsent(consentRecord.purposes, [ch.id]);
+                    }
+                  }}
                   style={{
-                    padding: '0.3rem 0.65rem', borderRadius: 'var(--radius-full)',
+                    padding: '0.3rem 0.75rem', borderRadius: 'var(--radius-full)',
                     border: channel === ch.id ? '1.5px solid var(--accent)' : '1.5px solid var(--line)',
                     background: channel === ch.id ? 'var(--accent-pale)' : 'transparent',
                     color: channel === ch.id ? 'var(--accent)' : 'var(--ink-muted)',
@@ -451,179 +601,201 @@ export default function CheckinChat({ user }) {
                 </button>
               ))}
             </div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--ink-faint)', marginTop: '0.45rem' }}>
-              {channel === 'sms' ? 'Simulated SMS gateway' : channel === 'ivrs' ? 'Simulated IVRS voice telephony' : 'Native App channel (Web)'}
+            <div style={{ fontSize: '0.72rem', color: 'var(--ink-faint)', marginTop: '0.5rem' }}>
+              {channel === 'sms' ? 'SMS Gateway: Check-in prompts delivered by text message.' : channel === 'ivrs' ? 'IVRS Voice: Automated scheduled voice call.' : channel === 'web' ? 'Web Portal: Browser-based check-in.' : 'Native App: Mobile application notifications.'}
             </div>
           </div>
 
-          {/* Consent acknowledgment */}
-          {!consentGiven && (
-            <label className="card" style={{
-              display: 'flex', alignItems: 'flex-start', gap: '0.65rem', padding: '0.85rem 1rem',
-              background: 'var(--warm-pale)', borderRadius: 'var(--radius)', fontSize: '0.8rem', color: 'var(--ink-soft)',
-              cursor: 'pointer', border: '1px solid rgba(184, 134, 11, 0.18)', lineHeight: 1.45,
-            }}>
-              <input
-                type="checkbox"
-                checked={consentGiven}
-                onChange={() => {
-                  setConsentGiven(true);
-                  try {
-                    const stored = JSON.parse(localStorage.getItem(CONSENT_KEY) ?? '{}');
-                    stored[selectedCase] = true;
-                    localStorage.setItem(CONSENT_KEY, JSON.stringify(stored));
-                  } catch { /* ignore */ }
-                }}
-                style={{ accentColor: 'var(--accent)', width: 16, height: 16, marginTop: '0.15rem' }}
-              />
-              <span>
-                <strong>Confidentiality Consent:</strong> I understand this check-in connects me with support, and my responses are reviewed by my assigned welfare officer.
+          {/* Optional Voice Acoustic Check */}
+          <VoicePatternIndicator
+            caseId={selectedCase}
+            enabled={channel === 'app' || channel === 'web'}
+            hasVoiceConsent={hasVoiceConsent}
+            onRequestConsent={() => setShowConsentModal(true)}
+          />
+
+          {/* Server-Synced Consent & Rights Management */}
+          <div className="card" style={{ padding: '0.85rem 1rem', background: 'var(--warm-pale)', border: '1px solid rgba(184, 134, 11, 0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem' }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--ink)' }}>
+                Consent & Victim Rights
+              </div>
+              <span style={{
+                fontSize: '0.7rem',
+                fontWeight: 600,
+                padding: '0.15rem 0.5rem',
+                borderRadius: 'var(--radius-full)',
+                background: isConsentRevoked ? 'var(--risk-high-bg)' : 'var(--risk-low-bg)',
+                color: isConsentRevoked ? 'var(--risk-high)' : 'var(--risk-low)',
+              }}>
+                {isConsentRevoked ? 'Revoked' : 'Active'}
               </span>
-            </label>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+            </div>
 
-/**
- * Transparent scoring panel — shows WHY the score is what it is.
- * This is the key demo moment: victim types something, sees the score change,
- * and understands exactly what drove it.
- */
-function AssessmentPanel({ assessment }) {
-  const [expanded, setExpanded] = useState(true);
-  if (!assessment) return null;
-  const { score, band, explanation, emotions, prediction, escalation, signals, provenance } = assessment;
-  const drivers = explanation?.drivers ?? [];
-  const bandColors = { low: '#4a7c59', moderate: '#a0722e', elevated: '#c45d3a', high: '#8b2e23' };
-  const bandBg = { low: 'rgba(74,124,89,0.12)', moderate: 'rgba(160,114,46,0.12)', elevated: 'rgba(196,93,58,0.12)', high: 'rgba(139,46,35,0.12)' };
-
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      className="card card-elevated"
-      style={{
-        borderRadius: 'var(--radius)',
-        border: escalation?.triggered ? '1.5px solid var(--risk-elevated)' : '1px solid var(--line-strong)',
-        background: escalation?.triggered ? 'var(--risk-high-bg)' : 'var(--surface)',
-        animation: 'fadeIn 0.3s var(--ease-out)',
-        padding: 0,
-        overflow: 'hidden',
-      }}
-    >
-      {/* Score header */}
-      <div
-        onClick={() => setExpanded(!expanded)}
-        style={{
-          padding: '0.85rem 1.1rem', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap',
-          background: escalation?.triggered ? 'rgba(186, 26, 26, 0.06)' : 'transparent',
-          borderBottom: expanded ? '1px solid var(--line-faint)' : 'none',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span style={{ fontWeight: 800, fontSize: '1.4rem', color: bandColors[band] || 'var(--ink)' }}>{score}</span>
-          <span style={{
-            fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase',
-            padding: '0.2rem 0.6rem', borderRadius: 'var(--radius-full)',
-            background: bandBg[band] || 'var(--surface-sunken)', color: bandColors[band] || 'var(--ink)',
-            letterSpacing: '0.04em',
-          }}>{band}</span>
-        </div>
-        {escalation?.triggered && (
-          <span style={{ color: 'var(--risk-high)', fontWeight: 700, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-            ⚠️ Escalated
-          </span>
-        )}
-        {emotions?.primaryEmotion && (
-          <span style={{ fontSize: '0.78rem', color: 'var(--ink-muted)' }}>
-            Emotion: <strong>{emotions.primaryEmotion}</strong>
-          </span>
-        )}
-        <span style={{ color: 'var(--ink-muted)', marginLeft: 'auto', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-          {provenance?.source === 'live' ? '🟢 Live LLM' : '📋 Cached'}
-          <span style={{ marginLeft: '0.35rem', fontSize: '0.85rem' }}>{expanded ? '▴' : '▾'}</span>
-        </span>
-      </div>
-
-      {/* Expanded breakdown */}
-      {expanded && (
-        <div style={{ padding: '0.85rem 1.1rem 1.1rem' }}>
-          {/* Explanation headline */}
-          {explanation?.headline && (
-            <p style={{ margin: '0 0 0.75rem', fontSize: '0.85rem', color: 'var(--ink-soft)', fontStyle: 'italic', lineHeight: 1.45 }}>
-              "{explanation.headline}"
+            <p style={{ margin: '0 0 0.65rem', fontSize: '0.76rem', color: 'var(--ink-soft)', lineHeight: 1.45 }}>
+              Participation is voluntary. You retain the right to modify or revoke consent at any time without compromising your legal rights or statutory protections.
             </p>
-          )}
 
-          {/* Component breakdown bars */}
-          {drivers.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', margin: '0.5rem 0' }}>
-              <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                Score Drivers
-              </span>
-              {drivers.map((d) => (
-                <div key={d.component}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', marginBottom: '0.2rem' }}>
-                    <span style={{ fontWeight: 600, color: 'var(--ink-soft)' }}>{d.label}</span>
-                    <span style={{ color: 'var(--ink-muted)' }}>{d.contribution} pts ({d.sharePct}%)</span>
-                  </div>
-                  <div style={{ height: 6, background: 'var(--line-faint)', borderRadius: 3, overflow: 'hidden' }}>
-                    <div style={{
-                      height: '100%', borderRadius: 3,
-                      width: `${Math.min(100, d.sharePct)}%`,
-                      background: bandColors[band] || 'var(--accent)', opacity: 0.8,
-                      transition: 'width 0.5s ease-out',
-                    }} />
-                  </div>
-                  <p style={{ margin: '0.2rem 0 0', fontSize: '0.72rem', color: 'var(--ink-muted)', lineHeight: 1.35 }}>
-                    {d.detail}
-                  </p>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => setShowConsentModal(true)}
+                style={{ fontSize: '0.76rem', padding: '0.25rem 0.6rem' }}
+              >
+                ⚙️ Manage Consent
+              </button>
+              {!isConsentRevoked ? (
+                <button
+                  className="btn btn-sm"
+                  onClick={revokeConsent}
+                  style={{ fontSize: '0.76rem', padding: '0.25rem 0.6rem', background: 'transparent', color: 'var(--risk-high)', border: '1px solid var(--risk-high)' }}
+                >
+                  Revoke Consent
+                </button>
+              ) : (
+                <button
+                  className="btn btn-sm"
+                  onClick={() => updateConsent(['monitoring', 'communication', 'voice_analysis'], [channel])}
+                  style={{ fontSize: '0.76rem', padding: '0.25rem 0.6rem' }}
+                >
+                  Re-grant Consent
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Emergency / Crisis Helplines Card (Always Visible) */}
+          <div className="card card-elevated" style={{ padding: '0.85rem 1rem', borderLeft: '4px solid var(--risk-high)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.5rem' }}>
+              <span style={{ fontSize: '1rem' }}>🚨</span>
+              <strong style={{ fontSize: '0.85rem', color: 'var(--ink)' }}>24/7 Crisis & Emergency Helplines</strong>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.78rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.25rem 0', borderBottom: '1px solid var(--line-faint)' }}>
+                <div>
+                  <strong>Tele-MANAS</strong>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--ink-muted)' }}>National Mental Health Helpline</div>
                 </div>
-              ))}
-            </div>
-          )}
+                <a href="tel:14416" style={{ color: 'var(--accent)', fontWeight: 700, textDecoration: 'none' }}>14416</a>
+              </div>
 
-          {/* Signal phrases — person's own words */}
-          {explanation?.signalPhrases?.length > 0 && (
-            <div style={{ margin: '0.75rem 0 0.5rem', padding: '0.6rem 0.85rem', background: 'var(--warm-pale)', borderRadius: 'var(--radius-sm)' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '0.25rem' }}>
-                Person's own words:
-              </span>
-              {explanation.signalPhrases.map((p, i) => (
-                <span key={i} style={{ fontSize: '0.78rem', fontStyle: 'italic', color: 'var(--ink-soft)', display: 'inline-block', marginRight: '0.4rem' }}>
-                  "{p}"{i < explanation.signalPhrases.length - 1 ? ',' : ''}
-                </span>
-              ))}
-            </div>
-          )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.25rem 0', borderBottom: '1px solid var(--line-faint)' }}>
+                <div>
+                  <strong>National Emergency</strong>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--ink-muted)' }}>Police, Medical, Fire</div>
+                </div>
+                <a href="tel:112" style={{ color: 'var(--risk-high)', fontWeight: 700, textDecoration: 'none' }}>112</a>
+              </div>
 
-          {/* Prediction */}
-          {prediction?.predicted && (
-            <div style={{
-              margin: '0.65rem 0 0.4rem', padding: '0.6rem 0.85rem',
-              background: prediction.estimatedDaysToThreshold <= 14 ? 'var(--risk-high-bg)' : 'var(--risk-moderate-bg)',
-              borderRadius: 'var(--radius-sm)', fontSize: '0.82rem',
-            }}>
-              <strong>Prediction:</strong> Escalation estimated in ~{prediction.estimatedDaysToThreshold} days ({prediction.estimatedDate}).
-              {prediction.courtDateRisk && <span style={{ color: 'var(--risk-high)' }}> Court date within window.</span>}
-            </div>
-          )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.25rem 0', borderBottom: '1px solid var(--line-faint)' }}>
+                <div>
+                  <strong>National SC/ST Helpline</strong>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--ink-muted)' }}>PoA Act Assistance</div>
+                </div>
+                <a href="tel:14566" style={{ color: 'var(--accent)', fontWeight: 700, textDecoration: 'none' }}>14566</a>
+              </div>
 
-          {/* Escalation reasons */}
-          {escalation?.triggered && escalation.triggerReasons?.length > 0 && (
-            <div style={{ margin: '0.65rem 0 0', borderTop: '1px solid var(--line-faint)', paddingTop: '0.5rem' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--risk-high)' }}>Escalation reasons:</span>
-              <ul style={{ margin: '0.25rem 0 0', paddingLeft: '1.2rem' }}>
-                {escalation.triggerReasons.map((r) => (
-                  <li key={r.code} style={{ fontSize: '0.78rem', color: 'var(--ink-soft)' }}>{r.label}</li>
-                ))}
-              </ul>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.25rem 0' }}>
+                <div>
+                  <strong>KIRAN Helpline</strong>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--ink-muted)' }}>Govt Mental Health Support</div>
+                </div>
+                <a href="tel:18005990019" style={{ color: 'var(--ink-soft)', fontWeight: 600, textDecoration: 'none' }}>1800-599-0019</a>
+              </div>
             </div>
-          )}
+          </div>
+        </div>
+      </div>
+
+      {/* Consent Modal */}
+      {showConsentModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 100, padding: '1rem',
+        }}>
+          <div className="card" style={{ maxWidth: '32rem', width: '100%', padding: '1.5rem', animation: 'fadeIn 0.2s var(--ease-out)' }}>
+            <h3 style={{ margin: '0 0 0.5rem' }}>Consent & Privacy Preferences</h3>
+            <p style={{ fontSize: '0.85rem', color: 'var(--ink-muted)', marginBottom: '1.25rem', lineHeight: 1.5 }}>
+              Under the SC/ST (Prevention of Atrocities) Protection framework, you control what data is processed and how Sahara interacts with you.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginBottom: '1.5rem' }}>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem', cursor: 'pointer', fontSize: '0.85rem' }}>
+                <input
+                  type="checkbox"
+                  checked={consentRecord?.purposes?.includes('monitoring') ?? true}
+                  onChange={(e) => {
+                    const cur = consentRecord?.purposes || ['monitoring', 'communication'];
+                    const next = e.target.checked ? [...new Set([...cur, 'monitoring'])] : cur.filter((p) => p !== 'monitoring');
+                    updateConsent(next, [channel]);
+                  }}
+                  style={{ accentColor: 'var(--accent)', marginTop: '0.2rem' }}
+                />
+                <div>
+                  <strong>Well-being Monitoring</strong>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>
+                    Allows designated welfare officers to review check-ins and coordinate support.
+                  </div>
+                </div>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem', cursor: 'pointer', fontSize: '0.85rem' }}>
+                <input
+                  type="checkbox"
+                  checked={consentRecord?.purposes?.includes('communication') ?? true}
+                  onChange={(e) => {
+                    const cur = consentRecord?.purposes || ['monitoring', 'communication'];
+                    const next = e.target.checked ? [...new Set([...cur, 'communication'])] : cur.filter((p) => p !== 'communication');
+                    updateConsent(next, [channel]);
+                  }}
+                  style={{ accentColor: 'var(--accent)', marginTop: '0.2rem' }}
+                />
+                <div>
+                  <strong>Periodic Outreach & Reminders</strong>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>
+                    Receive scheduled check-in reminders via your chosen channel (App, SMS, IVRS).
+                  </div>
+                </div>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem', cursor: 'pointer', fontSize: '0.85rem' }}>
+                <input
+                  type="checkbox"
+                  checked={hasVoiceConsent}
+                  onChange={(e) => {
+                    const cur = consentRecord?.purposes || ['monitoring', 'communication'];
+                    const next = e.target.checked ? [...new Set([...cur, 'voice_analysis'])] : cur.filter((p) => p !== 'voice_analysis');
+                    updateConsent(next, [channel]);
+                  }}
+                  style={{ accentColor: 'var(--accent)', marginTop: '0.2rem' }}
+                />
+                <div>
+                  <strong>Voice Acoustic Analysis (Optional)</strong>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>
+                    Allows on-device acoustic pattern check. Raw audio is never stored or transmitted.
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--line-faint)', paddingTop: '1rem' }}>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={revokeConsent}
+                style={{ color: 'var(--risk-high)' }}
+              >
+                Revoke All Consent
+              </button>
+              <button
+                className="btn btn-sm"
+                onClick={() => setShowConsentModal(false)}
+              >
+                Save & Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

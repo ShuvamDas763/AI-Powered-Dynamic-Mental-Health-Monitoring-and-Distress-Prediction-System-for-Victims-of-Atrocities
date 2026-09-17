@@ -24,22 +24,31 @@ import { adminRouter } from './routes/admin.js';
 import { notificationsRouter } from './routes/notifications.js';
 import { exportRouter } from './routes/export.js';
 import { devRouter } from './routes/dev.js';
+import { consentRouter } from './routes/consent.js';
+import { outreachRouter } from './routes/outreach.js';
+import { authLimiter, checkinLimiter } from './access/rateLimiter.js';
 
 const app = express();
 
 app.use(express.json({ limit: '256kb' }));
 
-// CORS — allow the deployed frontend origin. In development the Vite proxy
-// makes requests same-origin, so this is only exercised in production.
+// CORS — explicit origin allowlist with credentials
 app.use(cors({
-  origin: true,
+  origin: (origin, callback) => {
+    // Allow non-browser requests (same-origin, test runners, mobile agents)
+    if (!origin) return callback(null, true);
+    if (!config.isProduction || config.clientOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('CORS origin denied by institutional policy.'));
+  },
   credentials: true,
 }));
 
 // Trust proxy for HTTPS behind Render/Railway load balancer.
 app.set('trust proxy', 1);
 
-const isProduction = process.env.NODE_ENV === 'production';
+const isProduction = config.isProduction;
 
 app.use(
   session({
@@ -66,8 +75,10 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-app.use('/api/auth', authRouter);
-app.use('/api/checkin', checkinRouter);
+app.use('/api/auth', authLimiter, authRouter);
+app.use('/api/checkin', checkinLimiter, checkinRouter);
+app.use('/api/consent', consentRouter);
+app.use('/api/outreach', outreachRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/export', exportRouter);
 

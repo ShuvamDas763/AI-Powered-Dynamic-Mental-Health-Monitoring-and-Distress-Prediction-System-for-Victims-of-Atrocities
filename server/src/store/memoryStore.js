@@ -32,6 +32,7 @@
 import { buildPersonaCases } from '../data/personas.js';
 import { assessCaseHistory } from '../domain/assessCase.js';
 import { makeCheckInHistory, PROVENANCE } from '../domain/records.js';
+import { buildConsentRecord, revokeConsent, isPurposeConsented, CONSENT_PURPOSE, COMMUNICATION_CHANNELS } from '../domain/consent.js';
 
 /**
  * Build a store.
@@ -47,6 +48,16 @@ export function createStore(options = {}) {
 
   /** caseId -> { caseRecord, raw, history, series }. */
   const cases = new Map();
+
+  /** caseId -> consentRecord. */
+  const consents = new Map();
+
+  /** caseId -> Array<InterventionRecord>. */
+  const interventions = new Map();
+  let interventionId = 0;
+
+  /** caseId -> OutreachScheduleRecord. */
+  const outreaches = new Map();
 
   /** victimUsername -> Array<{ id, caseId, type, message, createdAt, readAt }>. */
   const notifications = new Map();
@@ -64,10 +75,7 @@ export function createStore(options = {}) {
     return entry;
   }
 
-  // Seed the eight personas. buildPersonaCases already returns finished records, but
-  // the raw declarations are what this store needs to stay appendable, so the
-  // history is unwrapped back into raw form here.
-  for (const { caseRecord, history } of buildPersonaCases({ now: seedClock })) {
+  function seedCase(caseRecord, history) {
     const raw = history.map((c) => ({
       daysAgo: c.daysAgo,
       occurredAt: c.occurredAt,
@@ -76,16 +84,77 @@ export function createStore(options = {}) {
       locale: c.locale,
       turns: c.turns.map((t) => ({ speaker: t.speaker, text: t.text })),
       responseLatencyHours: c.responseLatencyHours,
-      // Only a reading the check-in owns is carried over. A value that was
-      // inherited from the previous check-in must be re-derived on rebuild, not
-      // frozen in as if it were this check-in's own.
       surfaceSentiment: c.surfaceSentimentCarriedForward ? undefined : c.surfaceSentiment,
       signals: [...c.signals],
       signalPhrases: [...c.signalPhrases],
       immediateReviewRequested: c.immediateReviewRequested,
       provenance: c.provenance,
     }));
-    cases.set(caseRecord.caseId, rebuild({ caseRecord, raw, history: [], series: [] }));
+    const entry = rebuild({ caseRecord, raw, history: [], series: [] });
+    cases.set(caseRecord.caseId, entry);
+
+    // 1. Authoritative consent seed
+    const isHindiCase = caseRecord.preferredLocale === 'hi';
+    consents.set(
+      caseRecord.caseId,
+      buildConsentRecord({
+        caseId: caseRecord.caseId,
+        userId: caseRecord.victimUsername || 'victim',
+        purposes: {
+          [CONSENT_PURPOSE.MONITORING]: true,
+          [CONSENT_PURPOSE.COMMUNICATION]: true,
+          [CONSENT_PURPOSE.VOICE_ANALYSIS]: true,
+        },
+        channelsAllowed: [
+          COMMUNICATION_CHANNELS.APP,
+          COMMUNICATION_CHANNELS.WEB,
+          COMMUNICATION_CHANNELS.SMS,
+          COMMUNICATION_CHANNELS.IVRS,
+        ],
+      }),
+    );
+
+    // 2. Closed-loop interventions seed from latest assessment
+    const latestAssessment = entry.series.at(-1);
+    const initialActions = latestAssessment?.interventions ?? [];
+    const caseIntvs = initialActions.map((action, idx) => ({
+      id: `intv-${++interventionId}`,
+      caseId: caseRecord.caseId,
+      code: action.code,
+      label: action.label,
+      description: action.description,
+      urgency: action.urgency,
+      responsibleUnit: action.urgency === 'immediate'
+        ? 'District Protection Cell / DLSA'
+        : 'Special Court Welfare Unit',
+      assignedOfficer: null,
+      status: 'RECOMMENDED',
+      outcomeNote: null,
+      outcomeCode: null,
+      createdAt: new Date(seedClock - (idx + 1) * 86_400_000).toISOString(),
+      dueAt: new Date(seedClock + (action.urgency === 'immediate' ? 86_400_000 : 7 * 86_400_000)).toISOString(),
+      updatedAt: new Date(seedClock).toISOString(),
+    }));
+    interventions.set(caseRecord.caseId, caseIntvs);
+
+    // 3. Outreach schedule seed
+    outreaches.set(caseRecord.caseId, {
+      caseId: caseRecord.caseId,
+      nextCheckInDate: new Date(seedClock + 3 * 86_400_000).toISOString().split('T')[0],
+      preferredChannel: isHindiCase ? 'app' : 'web',
+      lastSuccessfulChannel: 'app',
+      lastAttemptedChannel: 'app',
+      deliveryState: 'DELIVERED',
+      attemptCount: 1,
+      responseState: 'RESPONDED',
+      missedStreak: history.slice(-2).filter((c) => c.status === 'missed').length,
+      updatedAt: new Date(seedClock).toISOString(),
+    });
+  }
+
+  // Seed the eight personas.
+  for (const { caseRecord, history } of buildPersonaCases({ now: seedClock })) {
+    seedCase(caseRecord, history);
   }
 
   const entry = (caseId) => cases.get(caseId) ?? null;
@@ -267,28 +336,165 @@ export function createStore(options = {}) {
         });
     },
 
+    // ── Consent Repository Implementation ───────────────────────────
+
+    getConsent(caseId) {
+      return consents.get(caseId) ?? null;
+    },
+
+    saveConsent(record) {
+      if (!record?.caseId) throw new Error('Consent record requires a caseId');
+      consents.set(record.caseId, record);
+      return record;
+    },
+
+    revokeConsent(caseId, reason) {
+      const existing = consents.get(caseId);
+      if (!existing) return null;
+      const revoked = revokeConsent(existing, reason);
+      consents.set(caseId, revoked);
+      return revoked;
+    },
+
+    hasPurposeConsent(caseId, purpose) {
+      const record = consents.get(caseId);
+      return isPurposeConsented(record, purpose);
+    },
+
+    // ── Intervention Repository Implementation ──────────────────────
+
+    getInterventions(caseId) {
+      return (interventions.get(caseId) ?? []).slice();
+    },
+
+    saveIntervention(intv) {
+      if (!intv?.caseId) throw new Error('Intervention requires a caseId');
+      const list = interventions.get(intv.caseId) ?? [];
+      const item = {
+        id: intv.id || `intv-${++interventionId}`,
+        caseId: intv.caseId,
+        code: intv.code,
+        label: intv.label,
+        description: intv.description,
+        urgency: intv.urgency || 'this_week',
+        responsibleUnit: intv.responsibleUnit || 'District Protection Cell / DLSA',
+        assignedOfficer: intv.assignedOfficer || null,
+        status: intv.status || 'RECOMMENDED',
+        outcomeNote: intv.outcomeNote || null,
+        outcomeCode: intv.outcomeCode || null,
+        createdAt: intv.createdAt || new Date().toISOString(),
+        dueAt: intv.dueAt || new Date(Date.now() + 7 * 86_400_000).toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      list.push(item);
+      interventions.set(intv.caseId, list);
+      return item;
+    },
+
+    updateIntervention(id, updates = {}) {
+      for (const [caseId, list] of interventions.entries()) {
+        const idx = list.findIndex((it) => it.id === id);
+        if (idx !== -1) {
+          const updated = {
+            ...list[idx],
+            ...updates,
+            updatedAt: new Date().toISOString(),
+          };
+          list[idx] = updated;
+          interventions.set(caseId, list);
+          return updated;
+        }
+      }
+      return null;
+    },
+
+    getInterventionStats() {
+      let total = 0;
+      let backlog = 0;
+      let overdue = 0;
+      let completed = 0;
+      const now = new Date();
+
+      for (const list of interventions.values()) {
+        for (const item of list) {
+          total++;
+          if (item.status === 'COMPLETED' || item.status === 'CLOSED') {
+            completed++;
+          } else if (item.status !== 'DECLINED') {
+            backlog++;
+            if (item.dueAt && new Date(item.dueAt) < now) {
+              overdue++;
+            }
+          }
+        }
+      }
+
+      return {
+        totalInterventions: total,
+        backlogCount: backlog,
+        overdueCount: overdue,
+        completedCount: completed,
+        completionRate: total > 0 ? Math.round((completed / total) * 100) : 0,
+      };
+    },
+
+    // ── Outreach Repository Implementation ──────────────────────────
+
+    getOutreachSchedule(caseId) {
+      return outreaches.get(caseId) ?? null;
+    },
+
+    saveOutreachSchedule(schedule) {
+      if (!schedule?.caseId) throw new Error('Outreach schedule requires a caseId');
+      outreaches.set(schedule.caseId, schedule);
+      return schedule;
+    },
+
+    updateOutreachSchedule(caseId, updates = {}) {
+      const existing = outreaches.get(caseId);
+      if (!existing) return null;
+      const updated = {
+        ...existing,
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      };
+      outreaches.set(caseId, updated);
+      return updated;
+    },
+
+    listPendingOutreaches() {
+      return [...outreaches.values()].filter(
+        (o) => o.deliveryState === 'CHECKIN_DUE' || o.deliveryState === 'DELIVERY_ATTEMPTED',
+      );
+    },
+
+    getAggregateOutreachStats() {
+      let total = 0;
+      let missedCount = 0;
+      for (const e of cases.values()) {
+        total += e.history.length;
+        missedCount += e.history.filter((c) => c.status === 'missed').length;
+      }
+      return {
+        totalCheckIns: total,
+        missedCount,
+        missedCheckInRate: total > 0 ? Math.round((missedCount / total) * 100) : 0,
+      };
+    },
+
     /**
      * DEV ONLY — Reset the store to its initial seed state.
      * Clears all live check-ins and rebuilds from the persona declarations.
      */
     reset() {
       cases.clear();
+      consents.clear();
+      interventions.clear();
+      outreaches.clear();
+      interventionId = 0;
+
       for (const { caseRecord, history } of buildPersonaCases({ now: seedClock })) {
-        const raw = history.map((c) => ({
-          daysAgo: c.daysAgo,
-          occurredAt: c.occurredAt,
-          status: c.status,
-          channel: c.channel,
-          locale: c.locale,
-          turns: c.turns.map((t) => ({ speaker: t.speaker, text: t.text })),
-          responseLatencyHours: c.responseLatencyHours,
-          surfaceSentiment: c.surfaceSentimentCarriedForward ? undefined : c.surfaceSentiment,
-          signals: [...c.signals],
-          signalPhrases: [...c.signalPhrases],
-          immediateReviewRequested: c.immediateReviewRequested,
-          provenance: c.provenance,
-        }));
-        cases.set(caseRecord.caseId, rebuild({ caseRecord, raw, history: [], series: [] }));
+        seedCase(caseRecord, history);
       }
     },
   };

@@ -134,24 +134,82 @@ export default function AdminDashboard() {
         </div>
       </section>
 
-      {/* Summary Stats */}
+      {/* Primary National Distress Overview */}
       {summary && (
-        <div className="stats-row animate-in animate-in-delay-1" style={{ marginBottom: '1.5rem' }}>
-          <div className="stat-card card-elevated">
-            <div className="stat-value">{summary.total}</div>
-            <div className="stat-label">Total Cases</div>
+        <div style={{ marginBottom: '1.5rem' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.65rem' }}>
+            National Case Distress & Trajectory Metrics
           </div>
-          <div className="stat-card card-elevated">
-            <div className="stat-value" style={{ color: 'var(--risk-high)' }}>{summary.alertCount}</div>
-            <div className="stat-label">Active Alerts</div>
+          <div className="stats-row animate-in animate-in-delay-1">
+            <div className="stat-card card-elevated">
+              <div className="stat-value">{summary.totalMonitoredCases ?? summary.total}</div>
+              <div className="stat-label">Total Monitored Cases</div>
+            </div>
+            <div className="stat-card card-elevated">
+              <div className="stat-value" style={{ color: 'var(--risk-high)' }}>
+                {typeof summary.activeAlerts === 'string' ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                    {summary.activeAlerts}
+                    <span style={{ fontSize: '0.62rem', padding: '0.05rem 0.3rem', background: 'var(--risk-high-bg)', borderRadius: 'var(--radius-full)' }}>k&lt;5</span>
+                  </span>
+                ) : (
+                  summary.activeAlerts ?? summary.alertCount
+                )}
+              </div>
+              <div className="stat-label">Active Escalation Alerts</div>
+            </div>
+            <div className="stat-card card-elevated">
+              <div className="stat-value" style={{ color: 'var(--risk-elevated)' }}>
+                {typeof summary.risingTrajectories === 'string' ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                    {summary.risingTrajectories}
+                    <span style={{ fontSize: '0.62rem', padding: '0.05rem 0.3rem', background: 'var(--accent-pale)', borderRadius: 'var(--radius-full)' }}>k&lt;5</span>
+                  </span>
+                ) : (
+                  summary.risingTrajectories ?? summary.risingTrendCount
+                )}
+              </div>
+              <div className="stat-label">Rising Trajectories</div>
+            </div>
+            <div className="stat-card card-elevated">
+              <div className="stat-value">{summary.averageCheckInsPerCase ?? trends?.averageCheckInsPerCase ?? 0}</div>
+              <div className="stat-label">Avg Check-ins / Case</div>
+            </div>
           </div>
-          <div className="stat-card card-elevated">
-            <div className="stat-value" style={{ color: 'var(--risk-elevated)' }}>{summary.risingTrendCount}</div>
-            <div className="stat-label">Rising Trends</div>
+        </div>
+      )}
+
+      {/* Operational Delivery & Intervention Health */}
+      {summary && (
+        <div style={{ marginBottom: '1.5rem' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.65rem' }}>
+            Support Delivery & Operational Health
           </div>
-          <div className="stat-card card-elevated">
-            <div className="stat-value">{trends?.averageCheckInsPerCase ?? 0}</div>
-            <div className="stat-label">Avg Check-ins</div>
+          <div className="stats-row animate-in animate-in-delay-1">
+            <div className="stat-card card-elevated">
+              <div className="stat-value" style={{ color: 'var(--ink)' }}>
+                {summary.interventionBacklog ?? '—'}
+              </div>
+              <div className="stat-label">Active Intervention Backlog</div>
+            </div>
+            <div className="stat-card card-elevated">
+              <div className="stat-value" style={{ color: (summary.overdueInterventions ?? 0) > 0 ? 'var(--risk-high)' : 'var(--risk-low)' }}>
+                {summary.overdueInterventions ?? 0}
+              </div>
+              <div className="stat-label">Overdue Interventions</div>
+            </div>
+            <div className="stat-card card-elevated">
+              <div className="stat-value" style={{ color: 'var(--risk-moderate)' }}>
+                {summary.missedCheckInRate != null ? `${summary.missedCheckInRate}%` : '—'}
+              </div>
+              <div className="stat-label">Missed Check-in Rate</div>
+            </div>
+            <div className="stat-card card-elevated">
+              <div className="stat-value" style={{ color: 'var(--risk-low)' }}>
+                {summary.supportCompletionRate != null ? `${summary.supportCompletionRate}%` : '—'}
+              </div>
+              <div className="stat-label">Support Resolution Rate</div>
+            </div>
           </div>
         </div>
       )}

@@ -50,9 +50,43 @@ const CustomTooltip = ({ active, payload, label }) => {
   );
 };
 
+const LIFECYCLE_STAGES = [
+  { id: 'registration', label: 'Registration', desc: 'FIR & Portal Onboarding' },
+  { id: 'investigation', label: 'Investigation', desc: 'DySP Inquiry & Evidence' },
+  { id: 'trial', label: 'Trial', desc: 'Special Court Hearings' },
+  { id: 'compensation', label: 'Compensation', desc: 'Statutory Relief Disbursal' },
+  { id: 'rehabilitation', label: 'Rehabilitation', desc: 'Socio-economic Support' },
+  { id: 'closure', label: 'Closure', desc: 'Resolution & Monitoring End' },
+];
+
+function getStageIndex(stage) {
+  switch (stage) {
+    case 'registration': return 0;
+    case 'investigation': return 1;
+    case 'chargesheet_filed':
+    case 'trial_pending':
+    case 'trial_active': return 2;
+    case 'post_compensation': return 3;
+    case 'rehabilitation': return 4;
+    case 'closure': return 5;
+    default: return 1;
+  }
+}
+
 export default function CaseDetail({ caseId, onBack }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [interventionsList, setInterventionsList] = useState([]);
+  const [actionBusy, setActionBusy] = useState(false);
+
+  const loadInterventions = useCallback(async (cId) => {
+    try {
+      const { ok, body } = await api(`/counsellor/cases/${cId}/interventions`);
+      if (ok && body.interventions) {
+        setInterventionsList(body.interventions);
+      }
+    } catch { /* ignore */ }
+  }, []);
 
   useEffect(() => {
     if (!caseId) return;
@@ -61,7 +95,23 @@ export default function CaseDetail({ caseId, onBack }) {
       setData(body);
       setLoading(false);
     });
-  }, [caseId]);
+    loadInterventions(caseId);
+  }, [caseId, loadInterventions]);
+
+  async function handleInterventionAction(interventionId, action, params = {}) {
+    setActionBusy(true);
+    try {
+      await api(`/counsellor/cases/${caseId}/interventions/${interventionId}/action`, {
+        method: 'POST',
+        body: JSON.stringify({ action, ...params }),
+      });
+      await loadInterventions(caseId);
+      // Also refresh case detail
+      const { body } = await api(`/counsellor/cases/${caseId}`);
+      setData(body);
+    } catch { /* ignore */ }
+    setActionBusy(false);
+  }
 
   // Hooks must be called unconditionally — before any early returns.
   const copySummary = useCallback(() => {
@@ -200,6 +250,44 @@ export default function CaseDetail({ caseId, onBack }) {
         )}
       </div>
 
+      {/* Case Lifecycle Timeline Stepper */}
+      <div className="card animate-in animate-in-delay-1" style={{ marginTop: '1.25rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <h2 style={{ fontSize: '1.05rem', margin: 0 }}>Statutory Case Lifecycle (SC/ST PoA Act)</h2>
+          <span style={{ fontSize: '0.78rem', color: 'var(--ink-muted)' }}>
+            Current Stage: <strong style={{ color: 'var(--accent)' }}>{STAGE_LABELS[caseRecord.caseStage] || caseRecord.caseStage}</strong>
+          </span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative', overflowX: 'auto', paddingBottom: '0.5rem', gap: '0.5rem' }}>
+          {LIFECYCLE_STAGES.map((stg, i) => {
+            const currentIdx = getStageIndex(caseRecord.caseStage);
+            const isPast = i < currentIdx;
+            const isCurrent = i === currentIdx;
+            return (
+              <div key={stg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, minWidth: 95, textAlign: 'center' }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: '50%',
+                  background: isPast ? 'var(--risk-low)' : isCurrent ? 'var(--accent)' : 'var(--surface-sunken)',
+                  color: isPast || isCurrent ? '#fff' : 'var(--ink-muted)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.4rem',
+                  border: isCurrent ? '2px solid var(--surface)' : 'none',
+                  boxShadow: isCurrent ? '0 0 0 2px var(--accent)' : 'none',
+                }}>
+                  {isPast ? '✓' : i + 1}
+                </div>
+                <span style={{ fontSize: '0.8rem', fontWeight: isCurrent ? 700 : 600, color: isCurrent ? 'var(--ink)' : 'var(--ink-soft)' }}>
+                  {stg.label}
+                </span>
+                <span style={{ fontSize: '0.68rem', color: 'var(--ink-muted)', marginTop: '0.15rem', lineHeight: 1.3 }}>
+                  {stg.desc}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Emotions — radar chart + detail pills */}
       {emotions.emotions && (
         <div className="card animate-in animate-in-delay-2" style={{ marginTop: '1.25rem' }}>
@@ -300,71 +388,89 @@ export default function CaseDetail({ caseId, onBack }) {
         </div>
       )}
 
-      {/* Prediction — estimated time to escalation */}
+      {/* Early-Warning Trajectory Engine */}
       {prediction.predicted && (
         <div className="card animate-in animate-in-delay-2" style={{
           marginTop: '1.25rem',
-          borderLeft: '4px solid var(--risk-moderate)',
-          background: prediction.estimatedDaysToThreshold <= 14
+          borderLeft: `4px solid ${prediction.courtDateRisk || (prediction.projectedWindow?.minDays <= 14) ? 'var(--risk-high)' : 'var(--risk-moderate)'}`,
+          background: prediction.courtDateRisk || (prediction.projectedWindow?.minDays <= 14)
             ? 'var(--risk-high-bg)'
             : 'var(--risk-moderate-bg)',
         }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
-            <div className={`section-icon ${prediction.estimatedDaysToThreshold <= 14 ? 'section-icon-high' : 'section-icon-moderate'}`}>
+            <div className={`section-icon ${prediction.courtDateRisk || (prediction.projectedWindow?.minDays <= 14) ? 'section-icon-high' : 'section-icon-moderate'}`}>
               <IconClock size={20} />
             </div>
             <div style={{ flex: 1 }}>
-              <h2 style={{
-                fontSize: '1.05rem',
-                margin: '0 0 0.35rem',
-                color: prediction.estimatedDaysToThreshold <= 14 ? 'var(--risk-high)' : 'var(--risk-moderate)',
-              }}>
-                Trend Prediction
-              </h2>
-              <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: 1.5, color: 'var(--ink-soft)' }}>
-                {prediction.estimatedDaysToThreshold <= 14
-                  ? `Estimated escalation in approximately ${prediction.estimatedDaysToThreshold} days (${prediction.estimatedDate}). Current trajectory is concerning.`
-                  : `If current trajectory continues, estimated escalation in approximately ${prediction.estimatedDaysToThreshold} days (${prediction.estimatedDate}).`
-                }
-              </p>
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '0.65rem', flexWrap: 'wrap' }}>
-                <span style={{
-                  fontSize: '0.78rem',
-                  padding: '0.2rem 0.6rem',
-                  borderRadius: 'var(--radius-full)',
-                  background: prediction.confidence === 'high'
-                    ? 'var(--risk-low-bg)'
-                    : prediction.confidence === 'medium'
-                      ? 'var(--risk-moderate-bg)'
-                      : 'var(--risk-elevated-bg)',
-                  color: prediction.confidence === 'high'
-                    ? 'var(--risk-low)'
-                    : prediction.confidence === 'medium'
-                      ? 'var(--risk-moderate)'
-                      : 'var(--risk-elevated)',
-                  fontWeight: 600,
-                }}>
-                  Confidence: {prediction.confidence}
-                </span>
-                {prediction.courtDateRisk && (
-                  <span style={{
-                    fontSize: '0.78rem',
-                    padding: '0.2rem 0.6rem',
-                    borderRadius: 'var(--radius-full)',
-                    background: 'var(--risk-high-bg)',
-                    color: 'var(--risk-high)',
-                    fontWeight: 600,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.3rem',
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div>
+                  <h2 style={{
+                    fontSize: '1.08rem',
+                    margin: '0 0 0.25rem',
+                    color: prediction.courtDateRisk || (prediction.projectedWindow?.minDays <= 14) ? 'var(--risk-high)' : 'var(--risk-moderate)',
                   }}>
-                    <IconAlert size={14} /> Court date within window
+                    Early-Warning Trajectory Projection
+                  </h2>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--ink-muted)' }}>
+                    Empirical trajectory model based on {prediction.observationCount || checkIns.length} actual check-in observations over {prediction.observationWindowDays || 30} days
                   </span>
-                )}
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  <span style={{
+                    fontSize: '0.74rem', padding: '0.2rem 0.6rem', borderRadius: 'var(--radius-full)',
+                    background: prediction.evidenceQuality === 'robust' ? 'var(--risk-low-bg)' : prediction.evidenceQuality === 'moderate' ? 'var(--risk-moderate-bg)' : 'var(--accent-pale)',
+                    color: prediction.evidenceQuality === 'robust' ? 'var(--risk-low)' : prediction.evidenceQuality === 'moderate' ? 'var(--risk-moderate)' : 'var(--accent)',
+                    fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em',
+                  }}>
+                    Evidence: {prediction.evidenceQuality || 'moderate'}
+                  </span>
+                  <span style={{
+                    fontSize: '0.74rem', padding: '0.2rem 0.6rem', borderRadius: 'var(--radius-full)',
+                    background: 'var(--surface)', color: 'var(--ink)', fontWeight: 600,
+                  }}>
+                    Confidence: {prediction.confidence || 'medium'}
+                  </span>
+                </div>
               </div>
-              <p style={{ margin: '0.65rem 0 0', fontSize: '0.78rem', color: 'var(--ink-muted)', fontStyle: 'italic' }}>
-                {prediction.reasoning}
-              </p>
+
+              {/* Bounded Window Display */}
+              <div style={{ marginTop: '0.85rem', padding: '0.75rem 1rem', background: 'var(--surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--line-faint)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Projected Escalation Window
+                    </div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>
+                      {prediction.projectedWindow?.windowText || `${prediction.estimatedDaysToThreshold} days`}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--ink-soft)' }}>
+                      Estimated Range: {prediction.projectedWindow?.estimatedDateRange || prediction.estimatedDate}
+                    </div>
+                  </div>
+
+                  {prediction.courtDateRisk && (
+                    <div style={{
+                      padding: '0.4rem 0.75rem', borderRadius: 'var(--radius-sm)',
+                      background: 'var(--risk-high-bg)', border: '1px solid var(--risk-high)',
+                      color: 'var(--risk-high)', fontSize: '0.8rem', fontWeight: 700,
+                      display: 'flex', alignItems: 'center', gap: '0.4rem',
+                    }}>
+                      <IconAlert size={16} />
+                      <span>Court Date Overlap: Scheduled hearing falls within trajectory window!</span>
+                    </div>
+                  )}
+                </div>
+
+                <p style={{ margin: '0.65rem 0 0', fontSize: '0.84rem', color: 'var(--ink-soft)', lineHeight: 1.5 }}>
+                  {prediction.reasoning}
+                </p>
+              </div>
+
+              {/* Institutional Disclaimer */}
+              <div style={{ marginTop: '0.65rem', padding: '0.5rem 0.75rem', background: 'rgba(0,0,0,0.03)', borderRadius: 'var(--radius-xs)', fontSize: '0.72rem', color: 'var(--ink-muted)', lineHeight: 1.45 }}>
+                ⚠️ <strong>Methodological Disclaimer:</strong> {prediction.disclaimer || 'Empirical trajectory projection based on synthetic demonstration check-ins. This is an operational early-warning heuristic, NOT a psychiatric diagnosis or clinical prognosis.'}
+              </div>
             </div>
           </div>
         </div>
@@ -456,54 +562,238 @@ export default function CaseDetail({ caseId, onBack }) {
         </div>
       )}
 
-      {/* Interventions */}
-      {interventions.length > 0 && (
-        <div className="card animate-in animate-in-delay-3" style={{ marginTop: '1.25rem' }}>
-          <h2 style={{ fontSize: '1.05rem', margin: '0 0 0.75rem' }}>Recommended Interventions</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-            {interventions.map((intervention) => (
-              <div key={intervention.code} style={{
-                padding: '0.85rem 1rem',
-                background: 'var(--surface)',
-                border: '1px solid var(--line-faint)',
-                borderRadius: 'var(--radius)',
-                borderLeft: intervention.urgency === 'immediate'
-                  ? '3px solid var(--risk-high)'
-                  : intervention.urgency === 'this_week'
-                    ? '3px solid var(--risk-moderate)'
-                    : '3px solid var(--risk-low)',
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
-                  <strong style={{ fontSize: '0.9rem' }}>{intervention.label}</strong>
-                  <span style={{
-                    fontSize: '0.72rem',
-                    padding: '0.15rem 0.55rem',
-                    borderRadius: 'var(--radius-full)',
-                    fontWeight: 600,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                    background: intervention.urgency === 'immediate'
-                      ? 'var(--risk-high-bg)'
-                      : intervention.urgency === 'this_week'
-                        ? 'var(--risk-moderate-bg)'
-                        : 'var(--risk-low-bg)',
-                    color: intervention.urgency === 'immediate'
-                      ? 'var(--risk-high)'
-                      : intervention.urgency === 'this_week'
-                        ? 'var(--risk-moderate)'
-                        : 'var(--risk-low)',
-                  }}>
-                    {intervention.urgency === 'immediate' ? 'Immediate' : intervention.urgency === 'this_week' ? 'This week' : 'Next review'}
-                  </span>
-                </div>
-                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--ink-soft)', lineHeight: 1.5 }}>
-                  {intervention.description}
-                </p>
+      {/* Closed-Loop Intervention Lifecycle Manager */}
+      {(() => {
+        const displayList = interventionsList.length > 0 ? interventionsList : interventions;
+        if (!displayList || displayList.length === 0) return null;
+
+        const STATUS_BADGE_STYLE = {
+          RECOMMENDED: { bg: 'var(--surface-sunken)', color: 'var(--ink-muted)' },
+          ACCEPTED: { bg: 'rgba(49, 130, 206, 0.12)', color: '#3182ce' },
+          ASSIGNED: { bg: 'rgba(128, 90, 213, 0.12)', color: '#805ad5' },
+          CONTACT_ATTEMPTED: { bg: 'rgba(214, 158, 46, 0.12)', color: '#d69e2e' },
+          CONTACTED: { bg: 'rgba(49, 151, 149, 0.12)', color: '#319795' },
+          IN_PROGRESS: { bg: 'rgba(221, 107, 32, 0.12)', color: '#dd6b20' },
+          COMPLETED: { bg: 'rgba(74, 124, 89, 0.14)', color: 'var(--risk-low)' },
+          CLOSED: { bg: 'var(--surface-deep)', color: 'var(--ink-muted)' },
+        };
+
+        return (
+          <div className="card animate-in animate-in-delay-3" style={{ marginTop: '1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div>
+                <h2 style={{ fontSize: '1.05rem', margin: '0 0 0.2rem' }}>Closed-Loop Support Interventions</h2>
+                <span style={{ fontSize: '0.78rem', color: 'var(--ink-muted)' }}>
+                  Traceable human-in-the-loop lifecycle from recommendation to documented outcome
+                </span>
               </div>
-            ))}
+              {actionBusy && (
+                <span style={{ fontSize: '0.75rem', color: 'var(--accent)' }}>Updating status…</span>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {displayList.map((item) => {
+                const status = item.status || 'RECOMMENDED';
+                const badge = STATUS_BADGE_STYLE[status] || STATUS_BADGE_STYLE.RECOMMENDED;
+
+                return (
+                  <div key={item.id || item.code} style={{
+                    padding: '0.95rem 1.1rem',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--line-faint)',
+                    borderRadius: 'var(--radius)',
+                    borderLeft: item.urgency === 'immediate'
+                      ? '4px solid var(--risk-high)'
+                      : item.urgency === 'this_week'
+                        ? '4px solid var(--risk-moderate)'
+                        : '4px solid var(--risk-low)',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <div>
+                        <strong style={{ fontSize: '0.92rem' }}>{item.label}</strong>
+                        {item.assignedTo && (
+                          <span style={{ marginLeft: '0.6rem', fontSize: '0.75rem', color: 'var(--ink-muted)' }}>
+                            Assigned to: <strong>{item.assignedTo}</strong>
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                        <span style={{
+                          fontSize: '0.7rem',
+                          padding: '0.15rem 0.55rem',
+                          borderRadius: 'var(--radius-full)',
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          background: badge.bg,
+                          color: badge.color,
+                        }}>
+                          {status.replace(/_/g, ' ')}
+                        </span>
+
+                        <span style={{
+                          fontSize: '0.7rem',
+                          padding: '0.15rem 0.55rem',
+                          borderRadius: 'var(--radius-full)',
+                          fontWeight: 600,
+                          textTransform: 'uppercase',
+                          background: item.urgency === 'immediate'
+                            ? 'var(--risk-high-bg)'
+                            : item.urgency === 'this_week'
+                              ? 'var(--risk-moderate-bg)'
+                              : 'var(--risk-low-bg)',
+                          color: item.urgency === 'immediate'
+                            ? 'var(--risk-high)'
+                            : item.urgency === 'this_week'
+                              ? 'var(--risk-moderate)'
+                              : 'var(--risk-low)',
+                        }}>
+                          {item.urgency === 'immediate' ? 'Immediate' : item.urgency === 'this_week' ? 'This week' : 'Next review'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <p style={{ margin: '0 0 0.65rem', fontSize: '0.85rem', color: 'var(--ink-soft)', lineHeight: 1.5 }}>
+                      {item.description}
+                    </p>
+
+                    {/* Outcome tag if resolved or completed */}
+                    {item.outcome && (
+                      <div style={{ marginBottom: '0.65rem', fontSize: '0.76rem', color: 'var(--risk-low)', fontWeight: 600 }}>
+                        ✓ Documented Outcome: <span style={{ textTransform: 'capitalize' }}>{item.outcome.replace(/_/g, ' ')}</span>
+                      </div>
+                    )}
+
+                    {/* Action buttons based on status */}
+                    <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', borderTop: '1px dashed var(--line-faint)', paddingTop: '0.55rem' }}>
+                      {status === 'RECOMMENDED' && (
+                        <>
+                          <button
+                            className="btn btn-sm"
+                            disabled={actionBusy}
+                            onClick={() => handleInterventionAction(item.id || item.code, 'accept')}
+                            style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem' }}
+                          >
+                            ✓ Accept Action
+                          </button>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            disabled={actionBusy}
+                            onClick={() => handleInterventionAction(item.id || item.code, 'close', { outcome: 'declined' })}
+                            style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem', color: 'var(--ink-muted)' }}
+                          >
+                            Decline
+                          </button>
+                        </>
+                      )}
+
+                      {status === 'ACCEPTED' && (
+                        <button
+                          className="btn btn-sm"
+                          disabled={actionBusy}
+                          onClick={() => handleInterventionAction(item.id || item.code, 'assign', { assignedTo: 'District Welfare Officer' })}
+                          style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem' }}
+                        >
+                          Assign Welfare Officer
+                        </button>
+                      )}
+
+                      {status === 'ASSIGNED' && (
+                        <>
+                          <button
+                            className="btn btn-sm"
+                            disabled={actionBusy}
+                            onClick={() => handleInterventionAction(item.id || item.code, 'mark_contacted')}
+                            style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem' }}
+                          >
+                            Confirm Contacted
+                          </button>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            disabled={actionBusy}
+                            onClick={() => handleInterventionAction(item.id || item.code, 'attempt_contact')}
+                            style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem' }}
+                          >
+                            Log Contact Attempt
+                          </button>
+                        </>
+                      )}
+
+                      {(status === 'CONTACTED' || status === 'CONTACT_ATTEMPTED') && (
+                        <>
+                          <button
+                            className="btn btn-sm"
+                            disabled={actionBusy}
+                            onClick={() => handleInterventionAction(item.id || item.code, 'start')}
+                            style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem' }}
+                          >
+                            Begin Support Plan
+                          </button>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            disabled={actionBusy}
+                            onClick={() => handleInterventionAction(item.id || item.code, 'complete', { outcome: 'stabilized' })}
+                            style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem' }}
+                          >
+                            Mark Stabilized
+                          </button>
+                        </>
+                      )}
+
+                      {status === 'IN_PROGRESS' && (
+                        <>
+                          <button
+                            className="btn btn-sm"
+                            disabled={actionBusy}
+                            onClick={() => handleInterventionAction(item.id || item.code, 'complete', { outcome: 'resolved' })}
+                            style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem', background: 'var(--risk-low)', borderColor: 'var(--risk-low)' }}
+                          >
+                            ✓ Mark Resolved
+                          </button>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            disabled={actionBusy}
+                            onClick={() => handleInterventionAction(item.id || item.code, 'complete', { outcome: 'stabilized' })}
+                            style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem' }}
+                          >
+                            Mark Stabilized
+                          </button>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            disabled={actionBusy}
+                            onClick={() => handleInterventionAction(item.id || item.code, 'close', { outcome: 'transferred' })}
+                            style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem' }}
+                          >
+                            Transfer Unit
+                          </button>
+                        </>
+                      )}
+
+                      {status === 'COMPLETED' && (
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          disabled={actionBusy}
+                          onClick={() => handleInterventionAction(item.id || item.code, 'close', { outcome: item.outcome || 'resolved' })}
+                          style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem' }}
+                        >
+                          Archive & Close Case Action
+                        </button>
+                      )}
+
+                      {status === 'CLOSED' && (
+                        <span style={{ fontSize: '0.72rem', color: 'var(--ink-muted)', fontStyle: 'italic' }}>
+                          Intervention cycle completed & archived.
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Explainability */}
       {drivers.length > 0 && (

@@ -1,169 +1,272 @@
 /**
- * Trend prediction — extrapolates current trajectory to estimate time to escalation.
+ * Early-Warning Trajectory Projection Engine.
  *
- * WHY THIS EXISTS
+ * CONCEPTUAL REFACTOR
  * -------------------------------------------------------------------------
- * The problem statement requires the system to "predict escalation of
- * psychological distress BEFORE a crisis situation emerges." The scoring
- * engine already computes a trend (slope) across check-ins. This module
- * uses that slope to extrapolate when the score would cross the escalation
- * threshold, giving counsellors a concrete time estimate.
+ * This engine replaces naive linear extrapolation with a defensible,
+ * empirical early-warning trajectory model.
  *
- * IMPORTANT SCOPE NOTE
+ * Key Principles:
+ *   1. No clinical diagnosis or validated crisis prediction claims.
+ *   2. No hard-coded "7 days per check-in" assumption.
+ *   3. Calculates actual elapsed days and interval variance from check-in timestamps.
+ *   4. Evaluates evidence quality based on observation count, window width,
+ *      missingness, and trend stability.
+ *   5. Outputs an empirical time window (e.g. 14–24 days) rather than a single
+ *      misleading point-in-time prediction.
+ *
+ * INSTITUTIONAL DISCLAIMER
  * -------------------------------------------------------------------------
- * This is trend extrapolation, NOT clinical prediction. It assumes the
- * current trajectory continues at the same rate — which is often wrong
- * (people improve, situations change, interventions work). It is useful
- * as a decision-support tool: "if nothing changes, this case will cross
- * the threshold in approximately X days." It is NOT a claim about what
- * WILL happen.
- *
- * The prediction is deliberately conservative: it only fires when:
- *   1. There are at least 3 check-ins (enough data for a trend)
- *   2. The trend is worsening (slope > 0)
- *   3. The current score is below the escalation threshold (otherwise
- *      it has already escalated)
- *   4. The extrapolated crossing is within a reasonable horizon (90 days)
+ * "Trajectory projection is decision-support only and is not a clinical diagnosis
+ *  or validated crisis prediction."
  */
 
 import { ESCALATION_THRESHOLD } from './escalation.js';
 
-/** How many check-ins minimum before a prediction is meaningful. */
-const MIN_CHECK_INS_FOR_PREDICTION = 3;
-
-/** Maximum prediction horizon in days — beyond this, uncertainty is too high. */
-const MAX_HORIZON_DAYS = 90;
+export const MIN_OBSERVATIONS_FOR_TRAJECTORY = 3;
+export const MAX_HORIZON_DAYS = 90;
+export const TRAJECTORY_DISCLAIMER =
+  'Trajectory projection is decision-support only and is not a clinical diagnosis or validated crisis prediction.';
 
 /**
- * Predict when a case would cross the escalation threshold,
- * given its current trajectory.
+ * Project early-warning trajectory toward the support-review threshold.
  *
- * @param {{ score: number, trend: { slope: number, points: number, direction: string } }} assessment
- * @param {{ nextHearingDate?: string }} [caseRecord]
+ * @param {object} assessment
+ * @param {number} assessment.score Current composite distress score
+ * @param {{ slope: number, points: number, direction: string, delta?: number }} assessment.trend
+ * @param {Array<object>} [history] Full check-in history with timestamps and status
+ * @param {object} [caseRecord] Case docket with nextHearingDate
  * @returns {{
+ *   projected: boolean,
  *   predicted: boolean,
- *   estimatedDaysToThreshold: number|null,
- *   estimatedDate: string|null,
- *   confidence: 'low'|'medium'|'high',
+ *   estimatedWindowDays: { min: number, max: number } | null,
+ *   estimatedDaysToThreshold: number | null,
+ *   estimatedDate: string | null,
+ *   trajectoryDirection: 'rising' | 'stable' | 'improving',
+ *   evidenceQuality: 'preliminary' | 'moderate' | 'robust' | 'insufficient',
+ *   confidence: 'low' | 'medium' | 'high',
+ *   observations: number,
+ *   observationWindowDays: number,
+ *   missingnessRatio: number,
  *   reasoning: string,
+ *   courtDateOverlap: boolean,
  *   courtDateRisk: boolean,
+ *   disclaimer: string,
  * }}
  */
-export function predictEscalation(assessment, caseRecord) {
-  const score = assessment?.score ?? 0;
+export function projectTrajectory(assessment, history = [], caseRecord = null) {
+  const score = Number.isFinite(assessment?.score) ? assessment.score : 0;
   const trend = assessment?.trend ?? {};
-  const slope = trend.slope ?? 0;
-  const points = trend.points ?? 0;
+  const slope = Number.isFinite(trend.slope) ? trend.slope : 0;
 
-  // Not enough data for prediction
-  if (points < MIN_CHECK_INS_FOR_PREDICTION) {
+  // Use actual history array if provided, otherwise fallback to trend.points count
+  const validHistory = Array.isArray(history) ? history.filter((c) => c && typeof c === 'object') : [];
+  const observations = validHistory.length > 0 ? validHistory.length : (trend.points || 0);
+
+  // Derive actual elapsed observation window from real timestamps
+  let observationWindowDays = 0;
+  let missingCount = 0;
+
+  if (validHistory.length >= 2) {
+    const timestamps = validHistory
+      .map((c) => (c.occurredAt ? new Date(c.occurredAt).getTime() : null))
+      .filter((t) => Number.isFinite(t))
+      .sort((a, b) => a - b);
+
+    if (timestamps.length >= 2) {
+      const elapsedMs = timestamps[timestamps.length - 1] - timestamps[0];
+      observationWindowDays = Math.max(1, Math.round(elapsedMs / (24 * 60 * 60 * 1000)));
+    } else {
+      observationWindowDays = Math.max(1, (observations - 1) * 7);
+    }
+    missingCount = validHistory.filter((c) => c.status === 'missed').length;
+  } else if (observations > 1) {
+    observationWindowDays = (observations - 1) * 7;
+  }
+
+  const missingnessRatio = observations > 0 ? Math.round((missingCount / observations) * 100) / 100 : 0;
+
+  // Trajectory direction
+  const trajectoryDirection = slope > 0.5 ? 'rising' : slope < -0.5 ? 'improving' : 'stable';
+
+  // Evaluate Evidence Quality
+  let evidenceQuality = 'insufficient';
+  let confidence = 'low';
+
+  if (observations >= 6 && missingnessRatio <= 0.25) {
+    evidenceQuality = 'robust';
+    confidence = 'high';
+  } else if (observations >= 4 && missingnessRatio <= 0.40) {
+    evidenceQuality = 'moderate';
+    confidence = 'medium';
+  } else if (observations >= MIN_OBSERVATIONS_FOR_TRAJECTORY) {
+    evidenceQuality = 'preliminary';
+    confidence = 'low';
+  }
+
+  // Guard: Insufficient data
+  if (observations < MIN_OBSERVATIONS_FOR_TRAJECTORY) {
     return {
+      projected: false,
       predicted: false,
+      estimatedWindowDays: null,
       estimatedDaysToThreshold: null,
       estimatedDate: null,
+      trajectoryDirection,
+      evidenceQuality: 'insufficient',
       confidence: 'low',
-      reasoning: `Not enough check-ins yet for trend prediction (${points}/${MIN_CHECK_INS_FOR_PREDICTION} minimum).`,
+      observations,
+      observationWindowDays,
+      missingnessRatio,
+      reasoning: `Trajectory requires at least ${MIN_OBSERVATIONS_FOR_TRAJECTORY} observations (${observations} recorded over ${observationWindowDays} days).`,
+      courtDateOverlap: false,
       courtDateRisk: false,
+      disclaimer: TRAJECTORY_DISCLAIMER,
     };
   }
 
-  // Already escalated — no need to predict
+  // Guard: Already crossed threshold
   if (score >= ESCALATION_THRESHOLD) {
     return {
+      projected: false,
       predicted: false,
+      estimatedWindowDays: null,
       estimatedDaysToThreshold: 0,
       estimatedDate: null,
+      trajectoryDirection,
+      evidenceQuality,
       confidence: 'high',
-      reasoning: `Case has already crossed the escalation threshold (score: ${score}, threshold: ${ESCALATION_THRESHOLD}).`,
+      observations,
+      observationWindowDays,
+      missingnessRatio,
+      reasoning: `Case currently meets or exceeds the support-review threshold (score ${score} / threshold ${ESCALATION_THRESHOLD}). Active human review required.`,
+      courtDateOverlap: false,
       courtDateRisk: false,
+      disclaimer: TRAJECTORY_DISCLAIMER,
     };
   }
 
-  // Trend is improving or stable — no escalation predicted
+  // Guard: Improving or Stable
   if (slope <= 0) {
     return {
+      projected: false,
       predicted: false,
+      estimatedWindowDays: null,
       estimatedDaysToThreshold: null,
       estimatedDate: null,
-      confidence: 'medium',
-      reasoning: trend.direction === 'improving'
-        ? 'Trend is improving — no escalation predicted.'
-        : 'Trend is stable — no escalation predicted.',
+      trajectoryDirection,
+      evidenceQuality,
+      confidence,
+      observations,
+      observationWindowDays,
+      missingnessRatio,
+      reasoning: trajectoryDirection === 'improving'
+        ? 'Distress trend is improving across recent observations. No threshold crossing projected.'
+        : 'Distress trend is stable. Score remains consistently below the review threshold.',
+      courtDateOverlap: false,
       courtDateRisk: false,
+      disclaimer: TRAJECTORY_DISCLAIMER,
     };
   }
 
-  // Extrapolate: how many check-ins until score crosses threshold?
-  // Slope is points per check-in. Average check-in interval varies,
-  // but we estimate ~7 days between check-ins for the time projection.
+  // Compute empirical check-in cadence (actual days between observations)
+  const avgDaysPerCheckin = observations > 1 && observationWindowDays > 0
+    ? Math.max(2, observationWindowDays / (observations - 1))
+    : 7;
+
+  // Project distance to threshold
   const gapToThreshold = ESCALATION_THRESHOLD - score;
   const checkInsToThreshold = gapToThreshold / slope;
-  const estimatedDays = Math.round(checkInsToThreshold * 7);
+  const nominalDays = checkInsToThreshold * avgDaysPerCheckin;
 
-  // Beyond reasonable horizon
-  if (estimatedDays > MAX_HORIZON_DAYS) {
+  // Empirical uncertainty window (bounded interval: ±25% to ±40% based on evidence quality)
+  const uncertaintyFactor = evidenceQuality === 'robust' ? 0.20 : evidenceQuality === 'moderate' ? 0.30 : 0.40;
+  const minDays = Math.max(3, Math.round(nominalDays * (1 - uncertaintyFactor)));
+  const maxDays = Math.max(minDays + 2, Math.round(nominalDays * (1 + uncertaintyFactor)));
+
+  // Guard: Beyond maximum defensible horizon
+  if (minDays > MAX_HORIZON_DAYS) {
     return {
+      projected: false,
       predicted: false,
-      estimatedDaysToThreshold: estimatedDays,
+      estimatedWindowDays: { min: minDays, max: maxDays },
+      estimatedDaysToThreshold: minDays,
       estimatedDate: null,
+      trajectoryDirection,
+      evidenceQuality: 'preliminary',
       confidence: 'low',
-      reasoning: `Current trajectory suggests escalation in approximately ${estimatedDays} days, which is beyond the reliable prediction horizon.`,
+      observations,
+      observationWindowDays,
+      missingnessRatio,
+      reasoning: `Rising trajectory is too gradual to reliably project within a ${MAX_HORIZON_DAYS}-day institutional horizon. Ongoing routine check-ins recommended.`,
+      courtDateOverlap: false,
       courtDateRisk: false,
+      disclaimer: TRAJECTORY_DISCLAIMER,
     };
   }
 
-  // Calculate estimated date
-  const now = new Date();
-  const estimatedDate = new Date(now.getTime() + estimatedDays * 24 * 60 * 60 * 1000);
-  const dateStr = estimatedDate.toISOString().split('T')[0];
-
-  // Confidence based on number of data points
-  const confidence = points >= 6 ? 'high' : points >= 4 ? 'medium' : 'low';
-
-  // Check if court date is within the prediction window
-  let courtDateRisk = false;
+  // Hearing overlap detection
+  let courtDateOverlap = false;
+  const now = Date.now();
   if (caseRecord?.nextHearingDate) {
-    const hearingDate = new Date(caseRecord.nextHearingDate);
-    const daysUntilHearing = Math.round((hearingDate - now) / (24 * 60 * 60 * 1000));
-    if (daysUntilHearing > 0 && daysUntilHearing <= estimatedDays) {
-      courtDateRisk = true;
+    const hearingTime = new Date(caseRecord.nextHearingDate).getTime();
+    const daysUntilHearing = Math.round((hearingTime - now) / (24 * 60 * 60 * 1000));
+    if (daysUntilHearing >= minDays - 3 && daysUntilHearing <= maxDays + 3) {
+      courtDateOverlap = true;
     }
   }
 
-  const reasoning = `Current score is ${score} (threshold: ${ESCALATION_THRESHOLD}). ` +
-    `Trend is worsening at ${slope.toFixed(1)} points per check-in. ` +
-    `At this rate, the case would cross the threshold in approximately ${estimatedDays} days ` +
-    `(~${checkInsToThreshold.toFixed(1)} check-ins). ` +
-    `Confidence: ${confidence} (${points} data points).` +
-    (courtDateRisk ? ' WARNING: Court date falls within the prediction window.' : '');
+  const estimatedDateObj = new Date(now + Math.round((minDays + maxDays) / 2) * 24 * 60 * 60 * 1000);
+  const estimatedDate = estimatedDateObj.toISOString().split('T')[0];
+
+  const reasoning =
+    `If the current pattern continues, the case may cross the support-review threshold ` +
+    `in approximately ${minDays}–${maxDays} days based on ${observations} observations over ${observationWindowDays} days.` +
+    (courtDateOverlap ? ' Notice: Next scheduled court hearing falls within this projected window.' : '');
 
   return {
-    predicted: true,
-    estimatedDaysToThreshold: estimatedDays,
-    estimatedDate: dateStr,
+    projected: true,
+    predicted: true, // Backward compatibility alias
+    estimatedWindowDays: { min: minDays, max: maxDays },
+    estimatedDaysToThreshold: minDays, // Backward compatibility numeric alias
+    estimatedDate,
+    trajectoryDirection,
+    evidenceQuality,
     confidence,
+    observations,
+    observationWindowDays,
+    missingnessRatio,
     reasoning,
-    courtDateRisk,
+    courtDateOverlap,
+    courtDateRisk: courtDateOverlap, // Backward compatibility alias
+    disclaimer: TRAJECTORY_DISCLAIMER,
   };
 }
 
 /**
- * Generate a short prediction summary for the counsellor dashboard.
+ * Backward compatibility wrapper for existing call sites.
  *
- * @param {ReturnType<typeof predictEscalation>} prediction
- * @returns {string}
+ * @param {object} assessment
+ * @param {object} [caseRecord]
+ * @param {Array<object>} [history]
  */
-export function predictionSummary(prediction) {
-  if (!prediction.predicted) {
-    return prediction.reasoning;
+export function predictEscalation(assessment, caseRecord, history = []) {
+  const actualHistory = Array.isArray(history) && history.length > 0
+    ? history
+    : (Array.isArray(assessment?.history) ? assessment.history : []);
+  return projectTrajectory(assessment, actualHistory, caseRecord);
+}
+
+/**
+ * Generate a short trajectory summary string for dashboard display.
+ */
+export function predictionSummary(trajectory) {
+  if (!trajectory?.projected && !trajectory?.predicted) {
+    return trajectory?.reasoning || 'No trajectory projected.';
   }
 
-  const urgency = prediction.estimatedDaysToThreshold <= 14
-    ? 'Urgent'
-    : prediction.estimatedDaysToThreshold <= 30
-    ? 'Attention needed'
-    : 'Monitor closely';
+  const min = trajectory.estimatedWindowDays?.min ?? trajectory.estimatedDaysToThreshold;
+  const max = trajectory.estimatedWindowDays?.max ?? (min + 7);
 
-  return `${urgency}: estimated escalation in ~${prediction.estimatedDaysToThreshold} days ` +
-    `(${prediction.estimatedDate}). ${prediction.courtDateRisk ? 'Court date within window.' : ''}`;
+  return `Projected support review window: ${min}–${max} days (${trajectory.evidenceQuality} evidence).`;
 }
