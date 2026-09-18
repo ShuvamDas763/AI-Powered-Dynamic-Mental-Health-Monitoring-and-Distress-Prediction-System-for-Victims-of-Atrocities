@@ -388,6 +388,9 @@ counsellorRouter.post('/cases/:caseId/interventions/:id/action', (req, res) => {
     complete: INTERVENTION_STATUS.COMPLETED,
     decline: INTERVENTION_STATUS.DECLINED,
     close: INTERVENTION_STATUS.CLOSED,
+    mark_contacted: INTERVENTION_STATUS.CONTACTED,
+    acknowledge: INTERVENTION_STATUS.ACCEPTED,
+    schedule_follow_up: INTERVENTION_STATUS.FOLLOW_UP_DUE,
   };
 
   const targetStatus = actionToStatus[action];
@@ -397,10 +400,13 @@ counsellorRouter.post('/cases/:caseId/interventions/:id/action', (req, res) => {
     });
   }
 
+  const resolvedOfficer = assignedOfficer || req.body?.assignedTo || req.body?.assigned;
+  const resolvedNote = outcomeNote || req.body?.note;
+
   try {
     const updated = transitionIntervention(current, targetStatus, {
-      assignedOfficer,
-      outcomeNote,
+      assignedOfficer: resolvedOfficer,
+      outcomeNote: resolvedNote,
       outcomeCode,
       dueAt,
     });

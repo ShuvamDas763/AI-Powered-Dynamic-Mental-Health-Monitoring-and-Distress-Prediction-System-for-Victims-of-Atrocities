@@ -696,7 +696,7 @@ Unlike commercial mental health apps that output generic relaxation tips, Sahara
 
 <h2>8.1 Test Coverage Metrics</h2>
 <p>
-The Sahara backend is protected by <strong>61 automated test suites comprising 328 individual unit, integration, and security tests</strong> executed using Node.js's native test runner (<code>node --test</code>):
+The Sahara backend is protected by <strong>75 automated test suites comprising 401 individual unit, integration, and security tests</strong> executed using Node.js's native test runner (<code>node --test</code>):
 </p>
 
 <table>
@@ -719,10 +719,10 @@ The Sahara backend is protected by <strong>61 automated test suites comprising 3
     <td>Strict monotonicity, component blend weight summation (=1.0), risk band floor thresholds, sustained surface mismatch (Persona F), and witness protection triggers.</td>
   </tr>
   <tr>
-    <td><strong>Two-Tier Access Control</strong></td>
+    <td><strong>Two-Tier Access Control &amp; Case Scoping</strong></td>
     <td>8 suites</td>
     <td>36 tests</td>
-    <td>403 Forbidden enforcement across role boundaries; zero PII leakage into Tier 2; small-cell suppression ($k \ge 5$).</td>
+    <td>403 Forbidden enforcement across role boundaries; zero PII leakage into Tier 2; small-cell suppression ($k \ge 5$); centralized resolveAuthorizedCase.</td>
   </tr>
   <tr>
     <td><strong>Safety &amp; Guardrails</strong></td>
@@ -737,16 +737,22 @@ The Sahara backend is protected by <strong>61 automated test suites comprising 3
     <td>Deterministic store reproduction, clock pinning, longitudinal history append, priority queue stability, and notification tracking.</td>
   </tr>
   <tr>
+    <td><strong>Consent, Outreach &amp; Interventions</strong></td>
+    <td>14 suites</td>
+    <td>73 tests</td>
+    <td>Safe opt-in consent defaults, consent-aware outreach fallback, retry delay timing, channel exhaustion alerts, and closed-loop statutory interventions.</td>
+  </tr>
+  <tr>
     <td><strong>TOTAL</strong></td>
-    <td><strong>61 suites</strong></td>
-    <td><strong>328 tests</strong></td>
+    <td><strong>75 suites</strong></td>
+    <td><strong>401 tests</strong></td>
     <td><strong>100% Pass Rate (0 failures, 0 skipped, 0 cancelled).</strong></td>
   </tr>
 </table>
 
 <h2>8.2 Reproducibility Instructions</h2>
 <pre>
-# 1. Run the complete test suite (328 tests)
+# 1. Run the complete test suite (401 tests across 75 suites)
 npm run test --workspace server
 
 # 2. Run model safety calibration probes

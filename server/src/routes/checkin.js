@@ -85,7 +85,7 @@ checkinRouter.post('/', async (req, res) => {
   // Check server-side consent record
   const consentRecord = store.getConsent(caseId);
   const isConsentActive = Boolean(
-    consentRecord && !consentRecord.revokedAt && consentRecord.purposes?.monitoring !== false,
+    consentRecord && !consentRecord.revokedAt && consentRecord.purposes?.monitoring === true,
   );
 
   // EMERGENCY LIFE-SAFETY OVERRIDE:

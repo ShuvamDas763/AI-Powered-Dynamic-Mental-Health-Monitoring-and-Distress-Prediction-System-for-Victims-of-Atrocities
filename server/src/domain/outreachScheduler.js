@@ -14,6 +14,7 @@
  */
 
 import { OUTREACH_STATE } from './outreachOrchestrator.js';
+import { CONSENT_PURPOSE } from './consent.js';
 
 export class OutreachScheduler {
   /**
@@ -97,18 +98,21 @@ export class OutreachScheduler {
       if (!schedule) continue;
 
       // 1. Date Validation & Due Check
-      if (!schedule.nextCheckInDate) continue;
-      const dueDate = new Date(schedule.nextCheckInDate);
-      if (Number.isNaN(dueDate.getTime())) {
-        // Invalid date string -> skip to avoid runaway execution loop
-        continue;
+      if (schedule.deliveryState === OUTREACH_STATE.CHECKIN_DUE) {
+        if (!schedule.nextCheckInDate) continue;
+        const dueDate = new Date(schedule.nextCheckInDate);
+        if (Number.isNaN(dueDate.getTime())) {
+          // Invalid date string -> skip
+          continue;
+        }
+
+        const dueStr = dueDate.toISOString().split('T')[0];
+        if (dueStr > todayStr) {
+          // Future outreach -> skip
+          continue;
+        }
       }
 
-      const dueStr = dueDate.toISOString().split('T')[0];
-      if (dueStr > todayStr) {
-        // Future outreach -> skip
-        continue;
-      }
 
       // 2. State Eligibility Check
       // Only process schedules that are due or actively retrying/falling back
@@ -122,17 +126,33 @@ export class OutreachScheduler {
         continue;
       }
 
-      // 3. Consent Verification
-      // Check if communication purpose has been granted or revoked
-      if (typeof this.store.hasPurposeConsent === 'function') {
-        const isConsented = this.store.hasPurposeConsent(caseId, 'communication');
-        if (isConsented === false) {
-          // Explicitly unconsented/revoked for communication
-          continue;
+      // 3. Retry / Fallback Timing Check (Fix #3)
+      if (
+        schedule.deliveryState === OUTREACH_STATE.RETRY ||
+        schedule.deliveryState === OUTREACH_STATE.ALTERNATE_CHANNEL
+      ) {
+        if (schedule.nextAttemptAt) {
+          const nextAttemptTime = new Date(schedule.nextAttemptAt).getTime();
+          if (!Number.isNaN(nextAttemptTime) && now < nextAttemptTime) {
+            // Not yet time to retry or attempt fallback channel -> skip!
+            continue;
+          }
         }
       }
 
-      // 4. Initiate Delivery
+      // 4. Consent Verification (Fix #1 & Fix #2)
+      // Re-evaluate current communication consent before dispatch
+      const consentRecord = typeof this.store.getConsent === 'function' ? this.store.getConsent(caseId) : null;
+      const isCommConsented = Boolean(
+        consentRecord && !consentRecord.revokedAt && consentRecord.purposes?.[CONSENT_PURPOSE.COMMUNICATION] === true
+      );
+
+      // If communication consent is missing, revoked, or has no allowed channels -> do not dispatch
+      if (!isCommConsented || !Array.isArray(consentRecord?.channelsAllowed) || consentRecord.channelsAllowed.length === 0) {
+        continue;
+      }
+
+      // 5. Initiate Delivery
       const result = await this.outreachService.attemptDelivery(caseId);
       results.push({
         caseId,

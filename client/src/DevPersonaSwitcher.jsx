@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { api } from './api.js';
 
 const STAGE_LABELS = {
   investigation: 'Investigation',
@@ -45,9 +46,8 @@ export default function DevPersonaSwitcher({ onSignIn, onDevLogin, busy: parentB
     if (busy || parentBusy) return;
     setBusy(true);
     try {
-      const res = await fetch('/api/dev/login', {
+      const res = await api('/dev/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key }),
       });
       if (res.ok) {
@@ -66,9 +66,8 @@ export default function DevPersonaSwitcher({ onSignIn, onDevLogin, busy: parentB
     if (busy || parentBusy) return;
     setBusy(true);
     try {
-      const res = await fetch('/api/dev/login', {
+      const res = await api('/dev/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key: 'counsellor' }),
       });
       if (res.ok && onDevLogin) {
@@ -84,20 +83,18 @@ export default function DevPersonaSwitcher({ onSignIn, onDevLogin, busy: parentB
   }
 
   useEffect(() => {
-    fetch('/api/health')
-      .then((r) => r.json())
-      .then((data) => {
-        setIsDev(data.isDev === true);
-        if (data.isDev) {
-          return fetch('/api/dev/personas');
+    api('/health')
+      .then((res) => {
+        setIsDev(res.body?.isDev === true);
+        if (res.body?.isDev) {
+          return api('/dev/personas');
         }
         return null;
       })
-      .then((r) => r?.json())
-      .then((data) => {
-        if (data) {
-          setPersonas(data.personas ?? []);
-          setRoles(data.roles ?? []);
+      .then((res) => {
+        if (res?.body) {
+          setPersonas(res.body.personas ?? []);
+          setRoles(res.body.roles ?? []);
         }
       })
       .catch(() => {});

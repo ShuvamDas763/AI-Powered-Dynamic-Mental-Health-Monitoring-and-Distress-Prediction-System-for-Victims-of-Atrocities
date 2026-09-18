@@ -17,6 +17,40 @@ import { GovernmentHeader, GovernmentFooter, AshokaChakra, IconCase, IconAlert, 
 import { I18nProvider, useI18n } from './i18n.jsx';
 import { api } from './api.js';
 
+function parseHash(hash) {
+  const clean = (hash || window.location.hash || '').replace(/^#\/?/, '').trim();
+  if (!clean || clean === 'home' || clean === 'login') return { page: 'home' };
+  if (clean === 'checkin') return { page: 'checkin' };
+  if (clean === 'counsellor') return { page: 'counsellor' };
+  if (clean === 'alerts') return { page: 'alerts' };
+  if (clean === 'admin') return { page: 'admin' };
+  if (clean.startsWith('cases/')) {
+    const caseId = clean.slice(6).trim();
+    return { page: 'caseDetail', caseId };
+  }
+  return { page: 'home' };
+}
+
+function toHash(view) {
+  if (!view || view.page === 'home') return '#/';
+  if (view.page === 'checkin') return '#/checkin';
+  if (view.page === 'counsellor') return '#/counsellor';
+  if (view.page === 'alerts') return '#/alerts';
+  if (view.page === 'admin') return '#/admin';
+  if (view.page === 'caseDetail' && view.caseId) return `#/cases/${view.caseId}`;
+  return '#/';
+}
+
+function isAuthorizedForView(user, view) {
+  if (!user || !view) return false;
+  const page = view.page;
+  if (page === 'home') return true;
+  if (page === 'checkin') return user.role === 'victim';
+  if (page === 'counsellor' || page === 'alerts' || page === 'caseDetail') return user.role === 'counsellor';
+  if (page === 'admin') return user.role === 'admin';
+  return false;
+}
+
 export default function App() {
   return (
     <I18nProvider>
@@ -28,7 +62,7 @@ export default function App() {
 function AppInner() {
   const { locale, setLocale, t } = useI18n();
   const [user, setUser] = useState(null);
-  const [view, setView] = useState({ page: 'home' });
+  const [view, setView] = useState(() => parseHash(window.location.hash));
   const [busy, setBusy] = useState(false);
 
   const refreshUser = useCallback(async () => {
@@ -40,11 +74,29 @@ function AppInner() {
     refreshUser();
   }, [refreshUser]);
 
+  // Sync state on browser URL hash changes (back/forward or manual edit)
+  useEffect(() => {
+    function handleHashChange() {
+      setView(parseHash(window.location.hash));
+    }
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  function navigate(page, params = {}) {
+    const nextView = { page, ...params };
+    const targetHash = toHash(nextView);
+    if (window.location.hash !== targetHash) {
+      window.location.hash = targetHash;
+    }
+    setView(nextView);
+  }
+
   // Dev panel navigation: listen for custom events from DevPersonaSwitcher
   useEffect(() => {
     function handleDevNav(e) {
       const { page, caseId } = e.detail ?? {};
-      if (page) setView({ page, ...(caseId ? { caseId } : {}) });
+      if (page) navigate(page, caseId ? { caseId } : {});
     }
     window.addEventListener('dev-navigate', handleDevNav);
     return () => window.removeEventListener('dev-navigate', handleDevNav);
@@ -62,14 +114,11 @@ function AppInner() {
 
   async function signOut() {
     setBusy(true);
+    window.location.hash = '#/';
     setView({ page: 'home' });
     await api('/auth/logout', { method: 'POST' });
     await refreshUser();
     setBusy(false);
-  }
-
-  function navigate(page, params = {}) {
-    setView({ page, ...params });
   }
 
   // Not signed in — show login.
@@ -77,11 +126,13 @@ function AppInner() {
     return <LoginPage onSignIn={signIn} onDevLogin={refreshUser} busy={busy} />;
   }
 
-  // Role-based default view.
+  // Role-based default view and access guard
   const defaultPage =
     user.role === 'counsellor' ? 'counsellor' : user.role === 'admin' ? 'admin' : 'checkin';
 
-  const currentPage = view.page === 'home' ? defaultPage : view.page;
+  const authorized = isAuthorizedForView(user, view);
+  const effectiveView = authorized && view.page !== 'home' ? view : { page: defaultPage };
+  const currentPage = effectiveView.page;
 
   return (
     <div className="app-shell">
@@ -89,31 +140,37 @@ function AppInner() {
       <GovernmentHeader />
 
       <nav className="top-nav-gov" aria-label="Main navigation">
-        <div className="nav-brand-gov">
-          <div style={{ width: 32, height: 32, borderRadius: 'var(--radius)', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ color: '#fff', fontSize: '0.75rem', fontWeight: 700 }}>स</span>
+        <div className="nav-brand-gov" role="banner">
+          <div className="nav-brand-logo" aria-hidden="true">
+            <span>स</span>
           </div>
           <div className="nav-brand-text">
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <span style={{ fontFamily: 'var(--font-display)', color: 'var(--accent)' }}>सहारा</span>
-              <span style={{ fontWeight: 600 }}>Sahara</span>
+            <div className="nav-brand-title">
+              <span className="nav-brand-hi">सहारा</span>
+              <span className="nav-brand-en">Sahara</span>
+            </div>
+            <span className="nav-brand-sub">
+              {locale === 'hi' ? 'कल्याण एवं संबल मंच · SIH 2026' : 'National Distress Monitoring & Well-being Support · SIH 2026'}
             </span>
-            <span className="nav-brand-sub">कल्याण एवं संबल मंच · SIH 2026</span>
           </div>
         </div>
 
-        <div className="nav-links">
+        <div className="nav-links" role="tablist">
           {user.role === 'counsellor' && (
             <>
               <button
                 className={`nav-icon-btn ${currentPage === 'counsellor' ? 'active' : ''}`}
                 onClick={() => navigate('counsellor')}
+                role="tab"
+                aria-selected={currentPage === 'counsellor'}
               >
                 <IconCase size={16} /> {t('nav.cases')}
               </button>
               <button
                 className={`nav-icon-btn ${currentPage === 'alerts' ? 'active' : ''}`}
                 onClick={() => navigate('alerts')}
+                role="tab"
+                aria-selected={currentPage === 'alerts'}
               >
                 <IconAlert size={16} /> {t('nav.alerts')}
               </button>
@@ -123,6 +180,8 @@ function AppInner() {
             <button
               className={`nav-icon-btn ${currentPage === 'admin' ? 'active' : ''}`}
               onClick={() => navigate('admin')}
+              role="tab"
+              aria-selected={currentPage === 'admin'}
             >
               <IconChart size={16} /> {t('nav.dashboard')}
             </button>
@@ -131,6 +190,8 @@ function AppInner() {
             <button
               className={`nav-icon-btn ${currentPage === 'checkin' ? 'active' : ''}`}
               onClick={() => navigate('checkin')}
+              role="tab"
+              aria-selected={currentPage === 'checkin'}
             >
               <IconChat size={16} /> {t('nav.checkin')}
             </button>
@@ -141,12 +202,19 @@ function AppInner() {
           <button
             onClick={() => setLocale(locale === 'en' ? 'hi' : 'en')}
             aria-label={locale === 'en' ? 'Switch to Hindi' : 'Switch to English'}
-            style={{ background: 'var(--surface-sunken)', border: '1px solid var(--line)', color: 'var(--ink-muted)', padding: '0.3rem 0.6rem', borderRadius: 'var(--radius-xs)', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 500 }}
+            className="btn btn-secondary btn-sm"
           >
             {locale === 'en' ? 'हिंदी' : 'English'}
           </button>
-          <span className="user-role" style={{ color: 'var(--ink-muted)' }}>{user.displayName}</span>
-          <button onClick={signOut} disabled={busy} aria-label={t('nav.signout')} style={{ background: 'var(--surface-sunken)', border: '1px solid var(--line)', color: 'var(--ink-muted)', padding: '0.35rem 0.75rem', borderRadius: 'var(--radius-xs)', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 500 }}>
+          <span className="user-role-badge" title={user.displayName}>
+            {user.displayName}
+          </span>
+          <button
+            onClick={signOut}
+            disabled={busy}
+            aria-label={t('nav.signout')}
+            className="btn btn-ghost btn-sm"
+          >
             {t('nav.signout')}
           </button>
         </div>
@@ -157,7 +225,7 @@ function AppInner() {
           <CounsellorDashboard onSelectCase={(caseId) => navigate('caseDetail', { caseId })} />
         )}
         {currentPage === 'caseDetail' && (
-          <CaseDetail caseId={view.caseId} onBack={() => navigate('counsellor')} />
+          <CaseDetail caseId={effectiveView.caseId} onBack={() => navigate('counsellor')} />
         )}
         {currentPage === 'alerts' && (
           <CounsellorDashboard

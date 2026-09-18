@@ -60,14 +60,14 @@ export function buildConsentRecord(input = {}) {
   const now = new Date().toISOString();
 
   const purposes = {
-    [CONSENT_PURPOSE.MONITORING]: input.purposes?.[CONSENT_PURPOSE.MONITORING] !== false,
-    [CONSENT_PURPOSE.COMMUNICATION]: input.purposes?.[CONSENT_PURPOSE.COMMUNICATION] !== false,
+    [CONSENT_PURPOSE.MONITORING]: input.purposes?.[CONSENT_PURPOSE.MONITORING] === true,
+    [CONSENT_PURPOSE.COMMUNICATION]: input.purposes?.[CONSENT_PURPOSE.COMMUNICATION] === true,
     [CONSENT_PURPOSE.VOICE_ANALYSIS]: input.purposes?.[CONSENT_PURPOSE.VOICE_ANALYSIS] === true,
   };
 
-  const channelsAllowed = Array.isArray(input.channelsAllowed) && input.channelsAllowed.length > 0
+  const channelsAllowed = Array.isArray(input.channelsAllowed)
     ? input.channelsAllowed.filter((ch) => Object.values(COMMUNICATION_CHANNELS).includes(ch))
-    : [COMMUNICATION_CHANNELS.WEB, COMMUNICATION_CHANNELS.APP];
+    : [];
 
   return {
     caseId: input.caseId,

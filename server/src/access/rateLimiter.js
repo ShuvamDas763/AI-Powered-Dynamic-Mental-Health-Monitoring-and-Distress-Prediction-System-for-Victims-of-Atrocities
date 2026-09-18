@@ -68,7 +68,7 @@ export function createRateLimiter(options = {}) {
 /** Preconfigured limiter for login attempts (15 per 15 minutes) */
 export const authLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  maxRequests: 20,
+  maxRequests: process.env.NODE_ENV === 'production' ? 20 : 200,
   message: 'Too many sign-in attempts. Please wait a few minutes before trying again.',
 });
 

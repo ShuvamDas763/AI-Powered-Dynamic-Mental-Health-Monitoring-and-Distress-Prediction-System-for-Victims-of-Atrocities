@@ -5,11 +5,25 @@ import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
 } from 'recharts';
 import { api } from './api.js';
-import { IconClock, IconAlert } from './GovernmentBranding.jsx';
+import { IconClock, IconAlert, IconArrowLeft, IconCheck, IconShield, IconFile, IconUser } from './GovernmentBranding.jsx';
 
 const BAND_CLASS = { low: 'band-low', moderate: 'band-moderate', elevated: 'band-elevated', high: 'band-high' };
 const STAGE_LABELS = { investigation: 'Investigation', trial_active: 'Trial (active)', trial_pending: 'Trial (pending)', chargesheet_filed: 'Chargesheet filed', post_compensation: 'Post-compensation' };
 const BAND_COLORS = { low: '#4a7c59', moderate: '#a0722e', elevated: '#c45d3a', high: '#8b2e23' };
+
+const TRIGGER_LABELS = {
+  intimidation_on_witness_case: 'Reported intimidation signal on an active witness docket',
+  sustained_surface_mismatch: 'Sustained mismatch between reassuring words and declining engagement (deflection)',
+  threshold_crossed: 'Crossed support-review threshold',
+  immediate_review_requested: 'Complainant directly requested counsellor contact',
+  rapid_escalation: 'Rapid velocity escalation',
+};
+
+function formatTriggerReason(r) {
+  if (!r) return '';
+  if (typeof r === 'object') return r.label || r.code || JSON.stringify(r);
+  return TRIGGER_LABELS[r] || r.replace(/_/g, ' ');
+}
 
 /**
  * Custom dot that flags non-comparable segments. When channel or locale changed
@@ -113,6 +127,17 @@ export default function CaseDetail({ caseId, onBack }) {
     setActionBusy(false);
   }
 
+  async function handleResolveAlert(alertId, note = 'Reviewed and addressed by counsellor') {
+    try {
+      await api(`/counsellor/operational-alerts/${alertId}/resolve`, {
+        method: 'POST',
+        body: JSON.stringify({ note }),
+      });
+      const { body } = await api(`/counsellor/cases/${caseId}`);
+      setData(body);
+    } catch { /* ignore */ }
+  }
+
   // Hooks must be called unconditionally — before any early returns.
   const copySummary = useCallback(() => {
     if (!data?.caseRecord) return;
@@ -136,15 +161,31 @@ export default function CaseDetail({ caseId, onBack }) {
   if (loading) {
     return (
       <div>
-        <button className="back-link" onClick={onBack}>&larr; Back to cases</button>
-        <div className="loading-shimmer" style={{ height: 200, marginBottom: '1rem' }} />
-        <div className="loading-shimmer" style={{ height: 300, marginBottom: '1rem' }} />
-        <div className="loading-shimmer" style={{ height: 200 }} />
+        <button className="back-link" onClick={onBack}>
+          <IconArrowLeft size={16} /> Back to cases
+        </button>
+        <div className="skeleton-row" style={{ height: 180, marginBottom: '1.25rem' }} />
+        <div className="skeleton-row" style={{ height: 260, marginBottom: '1.25rem' }} />
+        <div className="skeleton-row" style={{ height: 180 }} />
       </div>
     );
   }
 
-  if (!data || !data.caseRecord) return <p>Case not found.</p>;
+  if (!data || !data.caseRecord) {
+    return (
+      <div className="empty-state">
+        <div className="empty-state-title">Case Docket Not Found</div>
+        <div className="empty-state-desc">
+          The requested case identifier ({caseId}) does not exist in the active registry.
+        </div>
+        <div style={{ marginTop: '1rem' }}>
+          <button className="btn btn-secondary btn-sm" onClick={onBack}>
+            <IconArrowLeft size={14} /> Return to Casework Queue
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const { caseRecord, checkIns, trendData, latest } = data;
   const latestAssessment = latest;
@@ -154,6 +195,10 @@ export default function CaseDetail({ caseId, onBack }) {
   const explanation = latestAssessment?.explanation ?? {};
   const drivers = explanation.drivers ?? [];
   const interventions = latestAssessment?.interventions ?? [];
+  const trend = latestAssessment?.trend ?? {};
+  const mismatch = latestAssessment?.mismatch ?? {};
+  const operationalAlerts = data.operationalAlerts ?? [];
+  const activeOperationalAlerts = operationalAlerts.filter(a => a.status === 'active');
 
   // Flag segments where channel or locale changed — not directly comparable.
   const chartData = trendData.map((p, i) => {
@@ -173,9 +218,13 @@ export default function CaseDetail({ caseId, onBack }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button className="back-link animate-in" onClick={onBack}>&larr; Back to cases</button>
-        <button className="btn-copy animate-in" onClick={copySummary}>📋 Copy Summary</button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <button className="back-link animate-in" onClick={onBack} style={{ margin: 0 }}>
+          <IconArrowLeft size={16} /> Back to cases
+        </button>
+        <button className="btn-copy animate-in" onClick={copySummary}>
+          <IconFile size={15} /> Copy Case Summary
+        </button>
       </div>
 
       {/* Case Header — Hero card */}
@@ -250,6 +299,50 @@ export default function CaseDetail({ caseId, onBack }) {
         )}
       </div>
 
+      {/* Active Operational Review Alerts */}
+      {activeOperationalAlerts.length > 0 && (
+        <div className="card animate-in" style={{
+          marginTop: '1.25rem',
+          borderLeft: '4px solid var(--accent)',
+          background: 'var(--surface)',
+        }}>
+          <h3 style={{ fontSize: '1rem', margin: '0 0 0.65rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--ink)' }}>
+            <span>🔔</span> Operational Review Alerts ({activeOperationalAlerts.length})
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+            {activeOperationalAlerts.map(alert => (
+              <div key={alert.id} style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '0.6rem 0.85rem',
+                background: 'var(--surface-sunken)',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--line-faint)',
+                gap: '1rem',
+                flexWrap: 'wrap',
+              }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: '0.86rem', color: 'var(--ink)' }}>
+                    {alert.reason ?? alert.type ?? 'Case requires operational follow-up'}
+                  </div>
+                  <div style={{ fontSize: '0.76rem', color: 'var(--ink-muted)', marginTop: '0.15rem' }}>
+                    Triggered: {alert.triggeredAt ? new Date(alert.triggeredAt).toLocaleString() : 'Recent'} · Tier: {alert.targetTier || 'counsellor'}
+                  </div>
+                </div>
+                <button
+                  className="btn btn-secondary"
+                  style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem', whiteSpace: 'nowrap' }}
+                  onClick={() => handleResolveAlert(alert.id)}
+                >
+                  Resolve Alert
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Counsellor Triage: The 5 Core Questions (WHO, WHY, WHAT CHANGED, WHAT SHOULD I DO, WHEN TO FOLLOW UP) */}
       <div className="card card-elevated animate-in animate-in-delay-1" style={{ marginTop: '1.25rem', borderLeft: '4px solid var(--accent)', background: 'var(--surface)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--line-faint)', paddingBottom: '0.65rem', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -297,7 +390,7 @@ export default function CaseDetail({ caseId, onBack }) {
             </div>
             <div style={{ fontSize: '0.84rem', fontWeight: 600, color: escalation.triggered ? 'var(--risk-high)' : 'var(--ink)' }}>
               {escalation.triggered && escalation.triggerReasons?.length > 0
-                ? escalation.triggerReasons.map(r => r.label).join('; ')
+                ? escalation.triggerReasons.map(r => formatTriggerReason(r)).join('; ')
                 : explanation.headline || 'Routine scheduled support check-in.'}
             </div>
             <div style={{ fontSize: '0.75rem', color: 'var(--ink-muted)', marginTop: '0.3rem', lineHeight: 1.4 }}>
@@ -725,8 +818,10 @@ export default function CaseDetail({ caseId, onBack }) {
             <span style={{ fontSize: '1.2rem' }}>⚠</span> Escalation Reasons
           </h2>
           <ul style={{ margin: '0 0 0.65rem', paddingLeft: '1.2rem' }}>
-            {(escalation.triggerReasons ?? []).map((r) => (
-              <li key={r.code} style={{ marginBottom: '0.35rem', fontSize: '0.9rem', lineHeight: 1.5 }}>{r.label}</li>
+            {(escalation.triggerReasons ?? []).map((r, idx) => (
+              <li key={r.code || idx} style={{ marginBottom: '0.35rem', fontSize: '0.9rem', lineHeight: 1.5 }}>
+                {formatTriggerReason(r)}
+              </li>
             ))}
           </ul>
           <div style={{ padding: '0.6rem 0.85rem', background: 'var(--surface)', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem', color: 'var(--ink-muted)' }}>
@@ -786,9 +881,9 @@ export default function CaseDetail({ caseId, onBack }) {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                       <div>
                         <strong style={{ fontSize: '0.92rem' }}>{item.label}</strong>
-                        {item.assignedTo && (
+                        {(item.assignedOfficer || item.assignedTo) && (
                           <span style={{ marginLeft: '0.6rem', fontSize: '0.75rem', color: 'var(--ink-muted)' }}>
-                            Assigned to: <strong>{item.assignedTo}</strong>
+                            Assigned to: <strong>{item.assignedOfficer || item.assignedTo}</strong>
                           </span>
                         )}
                       </div>
@@ -833,9 +928,10 @@ export default function CaseDetail({ caseId, onBack }) {
                     </p>
 
                     {/* Outcome tag if resolved or completed */}
-                    {item.outcome && (
+                    {(item.outcomeCode || item.outcomeNote || item.outcome) && (
                       <div style={{ marginBottom: '0.65rem', fontSize: '0.76rem', color: 'var(--risk-low)', fontWeight: 600 }}>
-                        ✓ Documented Outcome: <span style={{ textTransform: 'capitalize' }}>{item.outcome.replace(/_/g, ' ')}</span>
+                        ✓ Documented Outcome: <span style={{ textTransform: 'capitalize' }}>{(item.outcomeCode || item.outcome || '').replace(/_/g, ' ')}</span>
+                        {item.outcomeNote && ` — ${item.outcomeNote}`}
                       </div>
                     )}
 
@@ -846,7 +942,7 @@ export default function CaseDetail({ caseId, onBack }) {
                           <button
                             className="btn btn-sm"
                             disabled={actionBusy}
-                            onClick={() => handleInterventionAction(item.id || item.code, 'accept')}
+                            onClick={() => handleInterventionAction(item.id, 'accept')}
                             style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem' }}
                           >
                             ✓ Accept Action
@@ -854,7 +950,7 @@ export default function CaseDetail({ caseId, onBack }) {
                           <button
                             className="btn btn-ghost btn-sm"
                             disabled={actionBusy}
-                            onClick={() => handleInterventionAction(item.id || item.code, 'close', { outcome: 'declined' })}
+                            onClick={() => handleInterventionAction(item.id, 'decline', { outcomeCode: 'declined', outcomeNote: 'Counsellor declined recommendation' })}
                             style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem', color: 'var(--ink-muted)' }}
                           >
                             Decline
@@ -863,14 +959,24 @@ export default function CaseDetail({ caseId, onBack }) {
                       )}
 
                       {status === 'ACCEPTED' && (
-                        <button
-                          className="btn btn-sm"
-                          disabled={actionBusy}
-                          onClick={() => handleInterventionAction(item.id || item.code, 'assign', { assignedTo: 'District Welfare Officer' })}
-                          style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem' }}
-                        >
-                          Assign Welfare Officer
-                        </button>
+                        <>
+                          <button
+                            className="btn btn-sm"
+                            disabled={actionBusy}
+                            onClick={() => handleInterventionAction(item.id, 'assign', { assignedOfficer: 'District Protection Cell / DLSA' })}
+                            style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem' }}
+                          >
+                            Assign Protection Cell
+                          </button>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            disabled={actionBusy}
+                            onClick={() => handleInterventionAction(item.id, 'decline')}
+                            style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem', color: 'var(--ink-muted)' }}
+                          >
+                            Decline
+                          </button>
+                        </>
                       )}
 
                       {status === 'ASSIGNED' && (
@@ -878,7 +984,7 @@ export default function CaseDetail({ caseId, onBack }) {
                           <button
                             className="btn btn-sm"
                             disabled={actionBusy}
-                            onClick={() => handleInterventionAction(item.id || item.code, 'mark_contacted')}
+                            onClick={() => handleInterventionAction(item.id, 'contact', { outcomeNote: 'Contact initiated with complainant' })}
                             style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem' }}
                           >
                             Confirm Contacted
@@ -886,60 +992,60 @@ export default function CaseDetail({ caseId, onBack }) {
                           <button
                             className="btn btn-ghost btn-sm"
                             disabled={actionBusy}
-                            onClick={() => handleInterventionAction(item.id || item.code, 'attempt_contact')}
-                            style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem' }}
+                            onClick={() => handleInterventionAction(item.id, 'decline')}
+                            style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem', color: 'var(--ink-muted)' }}
                           >
-                            Log Contact Attempt
+                            Decline
                           </button>
                         </>
                       )}
 
-                      {(status === 'CONTACTED' || status === 'CONTACT_ATTEMPTED') && (
+                      {status === 'CONTACTED' && (
                         <>
                           <button
                             className="btn btn-sm"
                             disabled={actionBusy}
-                            onClick={() => handleInterventionAction(item.id || item.code, 'start')}
-                            style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem' }}
-                          >
-                            Begin Support Plan
-                          </button>
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            disabled={actionBusy}
-                            onClick={() => handleInterventionAction(item.id || item.code, 'complete', { outcome: 'stabilized' })}
-                            style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem' }}
-                          >
-                            Mark Stabilized
-                          </button>
-                        </>
-                      )}
-
-                      {status === 'IN_PROGRESS' && (
-                        <>
-                          <button
-                            className="btn btn-sm"
-                            disabled={actionBusy}
-                            onClick={() => handleInterventionAction(item.id || item.code, 'complete', { outcome: 'resolved' })}
+                            onClick={() => handleInterventionAction(item.id, 'complete', { outcomeCode: 'support_completed', outcomeNote: 'Support delivered successfully' })}
                             style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem', background: 'var(--risk-low)', borderColor: 'var(--risk-low)' }}
                           >
-                            ✓ Mark Resolved
+                            ✓ Complete Support
                           </button>
                           <button
                             className="btn btn-ghost btn-sm"
                             disabled={actionBusy}
-                            onClick={() => handleInterventionAction(item.id || item.code, 'complete', { outcome: 'stabilized' })}
+                            onClick={() => handleInterventionAction(item.id, 'follow_up', { outcomeCode: 'follow_up_required', outcomeNote: 'Scheduled follow-up' })}
                             style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem' }}
                           >
-                            Mark Stabilized
+                            Schedule Follow-up
+                          </button>
+                        </>
+                      )}
+
+                      {status === 'FOLLOW_UP_DUE' && (
+                        <>
+                          <button
+                            className="btn btn-sm"
+                            disabled={actionBusy}
+                            onClick={() => handleInterventionAction(item.id, 'contact', { outcomeNote: 'Follow-up contact conducted' })}
+                            style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem' }}
+                          >
+                            Record Contact
+                          </button>
+                          <button
+                            className="btn btn-sm"
+                            disabled={actionBusy}
+                            onClick={() => handleInterventionAction(item.id, 'complete', { outcomeCode: 'support_completed', outcomeNote: 'Follow-up concluded successfully' })}
+                            style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem', background: 'var(--risk-low)', borderColor: 'var(--risk-low)' }}
+                          >
+                            Complete
                           </button>
                           <button
                             className="btn btn-ghost btn-sm"
                             disabled={actionBusy}
-                            onClick={() => handleInterventionAction(item.id || item.code, 'close', { outcome: 'transferred' })}
+                            onClick={() => handleInterventionAction(item.id, 'close', { outcomeCode: 'support_completed' })}
                             style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem' }}
                           >
-                            Transfer Unit
+                            Close
                           </button>
                         </>
                       )}
@@ -948,10 +1054,21 @@ export default function CaseDetail({ caseId, onBack }) {
                         <button
                           className="btn btn-ghost btn-sm"
                           disabled={actionBusy}
-                          onClick={() => handleInterventionAction(item.id || item.code, 'close', { outcome: item.outcome || 'resolved' })}
+                          onClick={() => handleInterventionAction(item.id, 'close', { outcomeCode: item.outcomeCode || 'support_completed' })}
                           style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem' }}
                         >
                           Archive & Close Case Action
+                        </button>
+                      )}
+
+                      {status === 'DECLINED' && (
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          disabled={actionBusy}
+                          onClick={() => handleInterventionAction(item.id, 'close', { outcomeCode: 'declined' })}
+                          style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem' }}
+                        >
+                          Archive Declined Action
                         </button>
                       )}
 

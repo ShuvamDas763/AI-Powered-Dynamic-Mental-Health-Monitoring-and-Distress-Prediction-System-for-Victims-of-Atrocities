@@ -1,8 +1,9 @@
 /**
- * Government branding components — national emblem, ministry header, footer.
+ * Government branding components — national emblem, ministry header, footer,
+ * and unified accessible SVG icon library.
  *
  * Provides the official identity layer for the SIH26094 prototype.
- * All text is factual and does not claim official government endorsement.
+ * All text is factual and adheres to institutional public-sector standards.
  */
 import { useI18n } from './i18n.jsx';
 
@@ -22,11 +23,8 @@ export function AshokaChakra({ size = 32, color = 'currentColor', className = ''
       aria-label="Ashoka Chakra"
       role="img"
     >
-      {/* Outer circle */}
       <circle cx="50" cy="50" r="46" stroke={color} strokeWidth="3" fill="none" />
-      {/* Inner circle */}
       <circle cx="50" cy="50" r="12" fill={color} />
-      {/* 24 spokes — representing 24 hours of the day */}
       {Array.from({ length: 24 }, (_, i) => {
         const angle = (i * 15 * Math.PI) / 180;
         const x1 = 50 + 14 * Math.cos(angle);
@@ -59,12 +57,14 @@ export function GovernmentHeader() {
     <header className="gov-header" role="banner">
       <div className="gov-header-inner">
         <div className="gov-header-left">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--secondary)" strokeWidth="2" aria-hidden="true">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--secondary)" strokeWidth="2.2" aria-hidden="true">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
           </svg>
           <span className="gov-header-portal">
-            {locale === 'hi' ? 'पूर्णतः गोपनीय व सुरक्षित मंच | All communications are confidential & human-reviewed' : 'All communications are confidential & human-reviewed | पूर्णतः गोपनीय व सुरक्षित मंच'}
+            {locale === 'hi'
+              ? 'पूर्णतः गोपनीय व सुरक्षित संबल मंच · राष्ट्रीय अनुसूचित जाति/जनजाति सुरक्षा ढाँचा'
+              : 'All communications are confidential & human-reviewed · SC/ST (PoA) Act, 1989 Framework'}
           </span>
         </div>
         <div className="gov-header-right">
@@ -72,9 +72,9 @@ export function GovernmentHeader() {
             className="gov-header-lang"
             onClick={() => setLocale(locale === 'en' ? 'hi' : 'en')}
             aria-label={locale === 'en' ? 'हिंदी में बदलें' : 'Switch to English'}
-            style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', font: 'inherit', padding: 0 }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', font: 'inherit', padding: 0 }}
           >
-            {locale === 'en' ? 'हिंदी / English' : 'English / हिंदी'}
+            {locale === 'en' ? 'हिंदी' : 'English'}
           </button>
         </div>
       </div>
@@ -92,16 +92,17 @@ export function GovernmentFooter() {
       <div className="gov-footer-inner">
         <div className="gov-footer-left">
           <div className="gov-footer-text">
-            <span>सहारा (Sahara) — A decision-support triage tool built for Smart India Hackathon 2026. Non-diagnostic.</span>
+            <span><strong>सहारा (Sahara)</strong> — Decision-support & dynamic well-being triage platform · Smart India Hackathon 2026.</span>
             <span className="gov-footer-sub">
-              Empowered under SC/ST (PoA) Act, 1989 support frameworks. Dedicated National Helplines: <strong style={{color:'var(--accent)'}}>14566</strong> (Toll-free) | <strong style={{color:'var(--accent)'}}>1800-202-1989</strong>
+              Statutory support coordination under the SC/ST (Prevention of Atrocities) Act, 1989.
+              Dedicated National Helplines: <strong style={{ color: 'var(--accent)' }}>14566</strong> (Toll-free) | Tele-MANAS: <strong style={{ color: 'var(--accent)' }}>14416</strong> | Emergency: <strong style={{ color: 'var(--risk-high)' }}>112</strong>
             </span>
           </div>
         </div>
         <div className="gov-footer-right">
-          <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.78rem' }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--secondary)', display: 'inline-block' }} />
-            स्थानीय रूप से सुरक्षित (Local storage active)
+            सत्यापित डेटा एन्क्रिप्शन (Encrypted local session active)
           </span>
         </div>
       </div>
@@ -110,11 +111,10 @@ export function GovernmentFooter() {
 }
 
 /**
- * Professional SVG icons — replacing emoji with consistent, accessible icons.
- * Each icon is a simple, institutional line-art style.
+ * Institutional SVG icons — replacing emoji with accessible line-art style.
  */
 
-export function IconCase({ size = 20, color = 'currentColor' }) {
+export function IconCase({ size = 18, color = 'currentColor' }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -126,7 +126,7 @@ export function IconCase({ size = 20, color = 'currentColor' }) {
   );
 }
 
-export function IconAlert({ size = 20, color = 'currentColor' }) {
+export function IconAlert({ size = 18, color = 'currentColor' }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
@@ -136,7 +136,7 @@ export function IconAlert({ size = 20, color = 'currentColor' }) {
   );
 }
 
-export function IconChart({ size = 20, color = 'currentColor' }) {
+export function IconChart({ size = 18, color = 'currentColor' }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <line x1="18" y1="20" x2="18" y2="10" />
@@ -146,7 +146,7 @@ export function IconChart({ size = 20, color = 'currentColor' }) {
   );
 }
 
-export function IconChat({ size = 20, color = 'currentColor' }) {
+export function IconChat({ size = 18, color = 'currentColor' }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
@@ -154,7 +154,7 @@ export function IconChat({ size = 20, color = 'currentColor' }) {
   );
 }
 
-export function IconShield({ size = 20, color = 'currentColor' }) {
+export function IconShield({ size = 18, color = 'currentColor' }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -162,7 +162,7 @@ export function IconShield({ size = 20, color = 'currentColor' }) {
   );
 }
 
-export function IconUser({ size = 20, color = 'currentColor' }) {
+export function IconUser({ size = 18, color = 'currentColor' }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -171,7 +171,7 @@ export function IconUser({ size = 20, color = 'currentColor' }) {
   );
 }
 
-export function IconSearch({ size = 20, color = 'currentColor' }) {
+export function IconSearch({ size = 18, color = 'currentColor' }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="11" cy="11" r="8" />
@@ -180,7 +180,7 @@ export function IconSearch({ size = 20, color = 'currentColor' }) {
   );
 }
 
-export function IconClock({ size = 20, color = 'currentColor' }) {
+export function IconClock({ size = 18, color = 'currentColor' }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="12" cy="12" r="10" />
@@ -189,7 +189,7 @@ export function IconClock({ size = 20, color = 'currentColor' }) {
   );
 }
 
-export function IconCheck({ size = 20, color = 'currentColor' }) {
+export function IconCheck({ size = 18, color = 'currentColor' }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <polyline points="20 6 9 17 4 12" />
@@ -197,11 +197,46 @@ export function IconCheck({ size = 20, color = 'currentColor' }) {
   );
 }
 
-export function IconFile({ size = 20, color = 'currentColor' }) {
+export function IconCheckCircle({ size = 18, color = 'currentColor' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="16 10 11 15 8 12" />
+    </svg>
+  );
+}
+
+export function IconFile({ size = 18, color = 'currentColor' }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
       <polyline points="13 2 13 9 20 9" />
+    </svg>
+  );
+}
+
+export function IconPhone({ size = 18, color = 'currentColor' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+    </svg>
+  );
+}
+
+export function IconArrowLeft({ size = 18, color = 'currentColor' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="19" y1="12" x2="5" y2="12" />
+      <polyline points="12 19 5 12 12 5" />
+    </svg>
+  );
+}
+
+export function IconLock({ size = 18, color = 'currentColor' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
     </svg>
   );
 }

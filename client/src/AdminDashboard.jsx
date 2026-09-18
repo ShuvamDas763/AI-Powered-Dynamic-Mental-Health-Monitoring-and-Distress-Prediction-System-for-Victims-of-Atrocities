@@ -15,6 +15,12 @@ const BAND_COLORS = {
 
 const BAND_LABELS = { low: 'Low', moderate: 'Moderate', elevated: 'Elevated', high: 'High' };
 
+const formatPercent = (val, fallback = '—') => {
+  if (val == null) return fallback;
+  const str = String(val).trim();
+  return str.endsWith('%') ? str : `${str}%`;
+};
+
 const CustomPieTooltip = ({ active, payload }) => {
   if (!active || !payload?.length) return null;
   const data = payload[0].payload;
@@ -200,13 +206,13 @@ export default function AdminDashboard() {
             </div>
             <div className="stat-card card-elevated">
               <div className="stat-value" style={{ color: 'var(--risk-moderate)' }}>
-                {summary.missedCheckInRate != null ? `${summary.missedCheckInRate}%` : '—'}
+                {formatPercent(summary.missedCheckInRate)}
               </div>
               <div className="stat-label">Missed Check-in Rate</div>
             </div>
             <div className="stat-card card-elevated">
               <div className="stat-value" style={{ color: 'var(--risk-low)' }}>
-                {summary.supportCompletionRate != null ? `${summary.supportCompletionRate}%` : '—'}
+                {formatPercent(summary.supportCompletionRate)}
               </div>
               <div className="stat-label">Support Resolution Rate</div>
             </div>
@@ -390,7 +396,7 @@ export default function AdminDashboard() {
               Support Resolution Rate
             </div>
             <div style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--risk-low)', marginTop: '0.15rem' }}>
-              {summary?.supportCompletionRate != null ? `${summary.supportCompletionRate}%` : '87.5%'}
+              {formatPercent(summary?.supportCompletionRate, '87.5%')}
             </div>
             <span style={{ fontSize: '0.74rem', color: 'var(--ink-soft)' }}>
               Recommended interventions closed with verified human outcome

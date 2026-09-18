@@ -97,7 +97,7 @@ export function createStore(options = {}) {
     const entry = rebuild({ caseRecord, raw, history: [], series: [] });
     cases.set(caseRecord.caseId, entry);
 
-    // 1. Authoritative consent seed
+    // 1. Authoritative consent seed — opt-in default for optional acoustic analysis
     const isHindiCase = caseRecord.preferredLocale === 'hi';
     consents.set(
       caseRecord.caseId,
@@ -107,7 +107,7 @@ export function createStore(options = {}) {
         purposes: {
           [CONSENT_PURPOSE.MONITORING]: true,
           [CONSENT_PURPOSE.COMMUNICATION]: true,
-          [CONSENT_PURPOSE.VOICE_ANALYSIS]: true,
+          [CONSENT_PURPOSE.VOICE_ANALYSIS]: true, // Seeded demo persona baseline
         },
         channelsAllowed: [
           COMMUNICATION_CHANNELS.APP,
@@ -139,27 +139,71 @@ export function createStore(options = {}) {
       dueAt: new Date(seedClock + (action.urgency === 'immediate' ? 86_400_000 : 7 * 86_400_000)).toISOString(),
       updatedAt: new Date(seedClock).toISOString(),
     }));
+
+    // Demo Scenario 6: Persona B (SIH-CASE-0002) has an intervention in progress (ASSIGNED)
+    if (caseRecord.caseId === 'SIH-CASE-0002' && caseIntvs.length > 0) {
+      caseIntvs[0].status = 'ASSIGNED';
+      caseIntvs[0].assignedOfficer = 'District Protection Cell / DLSA';
+    }
+
+    // Demo Scenario 7: Persona C (SIH-CASE-0003) has a completed intervention (COMPLETED)
+    if (caseRecord.caseId === 'SIH-CASE-0003' && caseIntvs.length > 0) {
+      caseIntvs[0].status = 'COMPLETED';
+      caseIntvs[0].outcomeCode = 'support_completed';
+      caseIntvs[0].outcomeNote = 'Post-compensation support session completed successfully.';
+    }
+
     interventions.set(caseRecord.caseId, caseIntvs);
 
     // 3. Outreach schedule seed
+    const isExhaustedPersonaH = caseRecord.caseId === 'SIH-CASE-0008';
     outreaches.set(caseRecord.caseId, {
       caseId: caseRecord.caseId,
-      nextCheckInDate: new Date(seedClock + 3 * 86_400_000).toISOString().split('T')[0],
+      nextCheckInDate: isExhaustedPersonaH
+        ? new Date(seedClock - 86_400_000).toISOString().split('T')[0]
+        : new Date(seedClock + 3 * 86_400_000).toISOString().split('T')[0],
       preferredChannel: isHindiCase ? 'app' : 'web',
-      lastSuccessfulChannel: 'app',
-      lastAttemptedChannel: 'app',
-      deliveryState: 'DELIVERED',
-      attemptCount: 1,
-      responseState: 'RESPONDED',
-      missedStreak: history.slice(-2).filter((c) => c.status === 'missed').length,
+      channel: isExhaustedPersonaH ? 'ivrs' : (isHindiCase ? 'app' : 'web'),
+      lastSuccessfulChannel: isExhaustedPersonaH ? null : 'app',
+      lastAttemptedChannel: isExhaustedPersonaH ? 'ivrs' : 'app',
+      deliveryState: isExhaustedPersonaH ? 'COUNSELLOR_FLAG' : 'DELIVERED',
+      state: isExhaustedPersonaH ? 'COUNSELLOR_FLAG' : 'DELIVERED',
+      attemptCount: isExhaustedPersonaH ? 2 : 1,
+      attemptNumber: isExhaustedPersonaH ? 2 : 1,
+      responseState: isExhaustedPersonaH ? 'UNRESPONSIVE' : 'RESPONDED',
+      missedStreak: isExhaustedPersonaH ? 2 : history.slice(-2).filter((c) => c.status === 'missed').length,
+      attemptedChannels: isExhaustedPersonaH ? ['app', 'sms', 'ivrs'] : ['app'],
+      failureReason: isExhaustedPersonaH ? 'Repeated unsuccessful contact across configured outreach channels.' : null,
       updatedAt: new Date(seedClock).toISOString(),
     });
   }
 
-  // Seed the eight personas.
-  for (const { caseRecord, history } of buildPersonaCases({ now: seedClock })) {
-    seedCase(caseRecord, history);
+  function seedAll() {
+    for (const { caseRecord, history } of buildPersonaCases({ now: seedClock })) {
+      seedCase(caseRecord, history);
+    }
+
+    // Demo Scenario 4: Seed operational alert for exhausted outreach (Persona H, SIH-CASE-0008)
+    operationalAlerts.set('op-alert-1', {
+      id: `op-alert-${++operationalAlertId}`,
+      caseId: 'SIH-CASE-0008',
+      type: 'outreach_exhausted',
+      reason: 'Repeated unsuccessful contact across configured outreach channels.',
+      urgency: 'medium',
+      source: 'outreach_orchestrator',
+      missedStreak: 2,
+      attemptedChannels: ['app', 'sms', 'ivrs'],
+      lastAttemptedChannel: 'ivrs',
+      status: 'active',
+      createdAt: new Date(seedClock - 3600_000).toISOString(),
+      updatedAt: new Date(seedClock - 3600_000).toISOString(),
+      resolvedAt: null,
+      resolutionNote: null,
+    });
   }
+
+  // Seed the eight personas and fixtures.
+  seedAll();
 
   const entry = (caseId) => cases.get(caseId) ?? null;
 
@@ -573,9 +617,7 @@ export function createStore(options = {}) {
       interventionId = 0;
       operationalAlertId = 0;
 
-      for (const { caseRecord, history } of buildPersonaCases({ now: seedClock })) {
-        seedCase(caseRecord, history);
-      }
+      seedAll();
     },
   };
 }

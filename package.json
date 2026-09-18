@@ -15,6 +15,7 @@
     "build": "npm run build --workspace client",
     "test": "npm run test --workspace server",
     "test:e2e": "playwright test",
+    "reset:demo": "npm run reset:demo --workspace server",
     "personas": "npm run personas --workspace server",
     "verify:safety": "npm run verify:safety --workspace server"
   },
@@ -22,7 +23,8 @@
     "node": ">=20"
   },
   "devDependencies": {
-    "@playwright/test": "^1.62.1",
+    "@playwright/mcp": "^0.0.81",
+    "@playwright/test": "^1.63.0",
     "concurrently": "^10.0.5"
   }
 }

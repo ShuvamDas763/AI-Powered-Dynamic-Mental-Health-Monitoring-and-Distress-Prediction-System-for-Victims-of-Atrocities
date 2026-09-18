@@ -247,7 +247,7 @@ $$a_t = \Delta S_t - \Delta S_{t-1}$$
 "Our architecture decouples clinical validation from model parameters:
 - The longitudinal tracking algorithm is mathematical (Bayesian EWMA) and does not drift.
 - Route 1 deterministic triggers are maintained via regular updates from psychiatric committees.
-- LLM prompt templates and classification schemas are version-controlled and tested against continuous regression test suites (currently 328 automated tests covering safety and distress benchmarks)."
+- LLM prompt templates and classification schemas are version-controlled and tested against continuous regression test suites (currently 401 automated tests across 75 test suites covering safety, access control, and distress benchmarks)."
 
 ### Question 15: "What is your system's resource consumption and server scalability profile?"
 **Architectural Rebuttal:**  
@@ -268,7 +268,7 @@ Route 2 LLM Classification Latency    284 ms               < 500 ms
 Client Bundle Size (Gzipped)          142 KB               < 250 KB
 Database Query Time (P99)             8.2 ms               < 20.0 ms
 Offline Cache Recovery Time           < 50 ms              < 100 ms
-Test Suite Coverage                   328/328 Passing      100% Pass
+Test Suite Coverage                   401/401 Passing      100% Pass
 ```
 
 ---

@@ -139,6 +139,8 @@ export const config = Object.freeze({
     schedulerEnabled: boolFromEnv('OUTREACH_SCHEDULER_ENABLED', true),
     /** Polling interval in ms for the outreach scheduler. */
     schedulerIntervalMs: intFromEnv('OUTREACH_SCHEDULER_INTERVAL_MS', 60_000),
+    /** Delay in ms before retrying a failed outreach attempt or attempting fallback channel. */
+    retryDelayMs: intFromEnv('OUTREACH_RETRY_DELAY_MS', 15 * 60_000),
   }),
 });
 
@@ -153,8 +155,9 @@ export function describeConfig() {
   lines.push(`min-cell-size=${config.privacy.minCellSize}`);
   lines.push(
     config.outreach.schedulerEnabled
-      ? `outreach-scheduler=enabled (interval ${config.outreach.schedulerIntervalMs}ms)`
+      ? `outreach-scheduler=enabled (interval ${config.outreach.schedulerIntervalMs}ms, retry-delay ${config.outreach.retryDelayMs}ms)`
       : 'outreach-scheduler=disabled',
   );
   return lines;
 }
+

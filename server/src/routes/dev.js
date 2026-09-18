@@ -236,3 +236,11 @@ devRouter.post('/checkin', (req, res) => {
 
   res.json({ ok: true, assessment });
 });
+
+/**
+ * POST /api/dev/reset — reset in-memory store to initial demo fixtures.
+ */
+devRouter.post('/reset', (req, res) => {
+  store.reset();
+  res.json({ ok: true, message: 'Store reset to pristine demo fixtures' });
+});

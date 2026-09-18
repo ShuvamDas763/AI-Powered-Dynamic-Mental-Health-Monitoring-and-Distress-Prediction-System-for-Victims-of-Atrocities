@@ -99,18 +99,31 @@ counsellor, laptop 3 as admin — three roles, one live system.
 
 ### Automated Testing
 
-Run the full automated test suite:
+Run the native automated test suite:
 
 ```bash
 npm test
 ```
 
-Executes **383 tests across 73 test suites** via Node's native test runner (`node --test`), verifying access control boundaries, scoring arithmetic, crisis detection, early-warning trajectory projections without timestamp fallbacks, pre-LLM consent gating, multi-channel outreach state machines, background scheduler locks, operational alerts on channel exhaustion, closed-loop interventions, and multilingual providers without external network dependencies.
+Executes **401 tests across 75 test suites (24 test files, 100% passing, 0 failing, 0 skipped)** via Node's native test runner (`node --test`), verifying access control boundaries, scoring arithmetic, crisis detection, early-warning trajectory projections without timestamp fallbacks, pre-LLM consent gating, safe opt-in consent defaults, multi-channel outreach state machines, non-punitive retry timing delays, background scheduler locks, operational alerts on channel exhaustion, closed-loop interventions, and multilingual providers without external network dependencies.
+
+#### Verification Commands & Scope Differentiation
+
+- **`npm test` (Unit & Integration Test Suite)**:
+  - **Runner**: Node.js native test runner (`node --test "src/**/*.test.js"`).
+  - **Scope**: **401 tests across 75 test suites in 24 test files**.
+  - **Execution**: 100% offline and deterministic; zero external network dependencies.
+  - **Guarantees**: Verifies domain logic, server-side RBAC, two-tier data separation, rate limiting, and mathematical algorithms.
+- **`npm run verify:safety` (Model Safety Probe Suite)**:
+  - **Runner**: Model audit script (`server/scripts/verify-model-safety.js`).
+  - **Scope**: **24 safety probe evaluations** (10 adversarial/edge-case check-in scenarios probed against primary and fallback LLMs + 4 moderation scanner tests).
+  - **Execution**: Live network probe requiring `GROQ_API_KEY`; queries live inference providers.
+  - **Guarantees**: Verifies that LLM responses strictly adhere to content-safety rules, refusing graphic details, clinical diagnoses, and prompt injection attacks.
 
 ### Technical Documentation
 
 Comprehensive architectural and methodological documentation is available in `docs/`:
-- [System Architecture](docs/architecture.md): 2-Tier Data Boundary, security hardening, repository interfaces.
+- [System Architecture](docs/architecture.md): 2-Tier Data Boundary, cross-tier operational services, security hardening, repository interfaces.
 - [Early-Warning Methodology](docs/early-warning-methodology.md): Longitudinal velocity, bounded windows, evidence quality, and court date overlap.
 - [Consent & Privacy Framework](docs/consent-and-privacy.md): Server-authoritative consent, granular purposes, and k-anonymity suppression ($k < 5$).
 - [Outreach Orchestrator](docs/outreach.md): Multi-channel state machine (Web, App, SMS, IVRS) and non-punitive retry policies.
@@ -121,40 +134,42 @@ Comprehensive architectural and methodological documentation is available in `do
 
 ## Comprehensive API Specification
 
-The API is strictly organized around the two-tier data boundary and role-based case scoping.
+The API is strictly organized around the two-tier data boundary, cross-tier operational services, and role-based case scoping.
 
 ### Route Summary & Access Tiers
 
-| Method | Endpoint | Access Tier / Role | Case-Scoping Rules | Parameters / Body | Responses & Status |
+| Method | Route | Auth | Role | Case Scope | Purpose |
 |---|---|---|---|---|---|
-| `GET` | `/api/health` | Public | None | None | `200` `{ status, llmMode, model, isDev }` |
-| `POST` | `/api/auth/login` | Public (Rate-limited) | None | Body: `{ username, passcode }` | `200` `{ ok, user }`, `401` Invalid credentials |
-| `POST` | `/api/auth/logout` | Public | None | None | `200` `{ ok: true }` |
-| `GET` | `/api/auth/me` | Public | Self-scoped session | None | `200` `{ user }` |
-| `POST` | `/api/checkin` | Victim / Counsellor (Rate-limited) | Victim locked to own `caseId`; Counsellor requires existing case | Body: `{ caseId, message, stage, clientDistressScore }` | `200` Analysis & response; `403` if routine check-in without active consent (`consentRequired: true`); emergency crisis routes bypass consent check |
-| `GET` | `/api/checkin/prompts/:caseId` | Victim / Counsellor | Victim locked to own `caseId`; Counsellor requires existing case | Path: `caseId` | `200` `{ caseId, prompts, locale }`, `403` / `404` |
-| `GET` | `/api/consent` | Victim / Counsellor | Admin blocked (`403`); Victim locked to own `caseId` (`403`); Counsellor targets case via `?caseId=` (`404` if not found) | Query: `?caseId=` (for Counsellor) | `200` `{ caseId, consentRecord, active, allowedChannels, allowedPurposes }` |
-| `POST` | `/api/consent` | Victim / Counsellor | Admin blocked (`403`); Victim locked to own `caseId`; Counsellor targets case | Body: `{ caseId?, consentGiven, allowedPurposes, allowedChannels, languagePreference }` | `200` `{ ok: true, consent }`, `400`, `403`, `404` |
-| `POST` | `/api/consent/revoke` | Victim / Counsellor | Admin blocked (`403`); Victim locked to own `caseId`; Counsellor targets case | Body: `{ caseId?, reason }` | `200` `{ ok: true, consent }` with inactive status and recorded rationale |
-| `GET` | `/api/outreach/:caseId` | Counsellor / Victim | Admin blocked (`403`); Victim locked to own `caseId` (`403`); Counsellor targets case | Path: `caseId` | `200` `{ caseId, schedule, history }`, `403`, `404` |
-| `POST` | `/api/outreach/schedule` | Counsellor / Victim | Admin blocked (`403`); Victim locked to own `caseId`; Counsellor targets case | Body: `{ caseId?, preferredChannel, scheduledAt }` | `201` `{ ok: true, schedule }`, `400`, `403`, `404` |
-| `POST` | `/api/outreach/:id/simulate-delivery` | Counsellor / Victim | Admin blocked (`403`); Victim locked to own case of outreach item | Path: `id`; Body: `{ status, failureReason }` | `200` `{ ok: true, schedule }` with updated state and fallback channel; triggers operational alert if exhausted |
-| `POST` | `/api/outreach/:id/simulate-response` | Counsellor / Victim | Admin blocked (`403`); Victim locked to own case of outreach item | Path: `id`; Body: `{ responded }` | `200` `{ ok: true, schedule }` |
-| `GET` | `/api/notifications` | Victim (self-scoped) | Session victim only | None | `200` `{ notifications, unreadCount }` |
-| `POST` | `/api/notifications/read` | Victim (self-scoped) | Session victim only | None | `200` `{ ok: true, readCount }` |
-| `GET` | `/api/counsellor/cases` | Tier 1 (Counsellor) | Tier 1 router guard; Admin blocked (`403`) | Query: optional filtering | `200` `{ cases, total, prioritisedQueue }` with triage status and WHY banners |
-| `GET` | `/api/counsellor/cases/:id` | Tier 1 (Counsellor) | Tier 1 router guard; Admin blocked (`403`) | Path: `id` | `200` Case detail, check-in history, trajectory, emotion profile, operational alerts, consent record |
-| `GET` | `/api/counsellor/alerts` | Tier 1 (Counsellor) | Tier 1 router guard; Admin blocked (`403`) | None | `200` `{ alerts, operationalAlerts }` including crisis reviews and outreach continuity flags |
-| `GET` | `/api/counsellor/operational-alerts` | Tier 1 (Counsellor) | Tier 1 router guard; Admin blocked (`403`) | Query: `?status=open|resolved` | `200` `{ alerts }` filterable operational alerts list |
-| `POST` | `/api/counsellor/operational-alerts/:id/resolve` | Tier 1 (Counsellor) | Tier 1 router guard; Admin blocked (`403`) | Path: `id`; Body: `{ note }` | `200` `{ ok: true, alert }` resolved operational alert |
-| `GET` | `/api/counsellor/cases/:caseId/interventions` | Tier 1 (Counsellor) | Tier 1 router guard; Admin blocked (`403`) | Path: `caseId` | `200` `{ interventions }` closed-loop support actions |
-| `POST` | `/api/counsellor/cases/:caseId/interventions/:id/action` | Tier 1 (Counsellor) | Tier 1 router guard; Admin blocked (`403`) | Path: `caseId`, `id`; Body: `{ action, note }` | `200` `{ ok: true, intervention }` lifecycle state transition |
-| `GET` | `/api/admin/summary` | Tier 2 (Admin) | Tier 2 router guard; Counsellor blocked (`403`) | None | `200` Aggregate counts, operational backlog, resolution metrics |
-| `GET` | `/api/admin/trends` | Tier 2 (Admin) | Tier 2 router guard; Counsellor blocked (`403`) | None | `200` Band distributions and trend directions with $k < 5$ suppression (`"<5"`) |
-| `GET` | `/api/admin/geography` | Tier 2 (Admin) | Tier 2 router guard; Counsellor blocked (`403`) | None | `200` Hierarchical geographic breakdown (national/state/district) with $k < 5$ suppression |
-| `GET` | `/api/export/cases.csv` | Tier 1 (Counsellor) | Tier 1 router guard; Admin blocked (`403`) | None | `200` CSV stream of case records |
-| `GET` | `/api/export/summary` | Tier 2 (Admin / Counsellor) | Tier 2 aggregate guard | None | `200` Aggregate summary report |
-| `POST` | `/api/dev/reset` | Dev-only | Disabled in production (`isDev: false`) | None | `200` In-memory store reset to synthetic seed |
+| `GET` | `/api/health` | None | Public | None | Diagnostic liveness probe & LLM configuration status |
+| `POST` | `/api/auth/login` | Rate-limited (`authLimiter`) | Public | None | Authenticate user; issues `sih26094.sid` session cookie |
+| `POST` | `/api/auth/logout` | Session | Authenticated | None | Terminate session & clear session cookie |
+| `GET` | `/api/auth/me` | Session | Authenticated | Self-scoped session | Fetch current authenticated session user profile |
+| `POST` | `/api/checkin` | Rate-limited + Session | `victim` only | Own `caseId` | Submit check-in turns; crisis detected first; pre-LLM consent gate; updates scores |
+| `GET` | `/api/checkin/prompts/:caseId` | Session | `victim` only | Own `caseId` | Localized conversational opening prompts for victim |
+| `GET` | `/api/consent` | Session | `victim`, `counsellor` | Victim: own `caseId`; Counsellor: `?caseId=`; Admin: blocked (`403`) | Fetch active consent record, granted purposes, and allowed channels |
+| `POST` | `/api/consent` | Session | `victim`, `counsellor` | Victim: own `caseId`; Counsellor: body `caseId`; Admin: blocked (`403`) | Grant/update consent with safe opt-in defaults; audit logged |
+| `POST` | `/api/consent/revoke` | Session | `victim`, `counsellor` | Victim: own `caseId`; Counsellor: body `caseId`; Admin: blocked (`403`) | Immediate non-punitive consent revocation; zeroes purposes & channels |
+| `GET` | `/api/outreach/:caseId` | Session | `victim`, `counsellor` | Victim: own `caseId`; Counsellor: param `caseId`; Admin: blocked (`403`) | View outreach schedule, current state, attempt counts, nextAttemptAt |
+| `POST` | `/api/outreach/schedule` | Session | `victim`, `counsellor` | Victim: own `caseId`; Counsellor: body `caseId`; Admin: blocked (`403`) | Schedule periodic check-in date & preferred communication channel |
+| `POST` | `/api/outreach/:id/simulate-delivery` | Session | `victim`, `counsellor` | Victim: own `caseId`; Counsellor: target `id`; Admin: blocked (`403`) | Trigger delivery attempt; verifies consent; enforces fallback ordering & retry delay |
+| `POST` | `/api/outreach/:id/simulate-response` | Session | `victim`, `counsellor` | Victim: own `caseId`; Counsellor: target `id`; Admin: blocked (`403`) | Record participant reply; clears retry timer; resets retry chain |
+| `GET` | `/api/notifications` | Session | `victim` only | Own `victimUsername` | Retrieve trauma-informed notification feedback loop (newest first) |
+| `POST` | `/api/notifications/read` | Session | `victim` only | Own `victimUsername` | Mark all notifications as read for current victim |
+| `GET` | `/api/counsellor/cases` | Session | `counsellor` (Tier 1) | All assigned cases (Admin: blocked `403`) | Triage queue sorted by escalation & priority-adjusted score; WHY banners |
+| `GET` | `/api/counsellor/cases/:caseId` | Session | `counsellor` (Tier 1) | Target case (Admin: blocked `403`) | Full longitudinal case record, trend history, emotion profile, interventions, alerts |
+| `POST` | `/api/counsellor/cases/:caseId/review` | Session | `counsellor` (Tier 1) | Target case (Admin: blocked `403`) | Mark check-in reviewed; sends notification to victim |
+| `GET` | `/api/counsellor/alerts` | Session | `counsellor` (Tier 1) | Escalated cases (Admin: blocked `403`) | Threshold-crossed alerts and active operational review flags |
+| `GET` | `/api/counsellor/operational-alerts` | Session | `counsellor` (Tier 1) | Filterable by status/caseId (Admin: blocked `403`) | Operational review alerts (outreach exhaustion, contact continuity) |
+| `POST` | `/api/counsellor/operational-alerts/:id/resolve` | Session | `counsellor` (Tier 1) | Target alert (Admin: blocked `403`) | Resolve operational alert with counsellor note; audit logged |
+| `GET` | `/api/counsellor/cases/:caseId/interventions` | Session | `counsellor` (Tier 1) | Target case (Admin: blocked `403`) | Statutory closed-loop support interventions and lifecycle statuses |
+| `POST` | `/api/counsellor/cases/:caseId/interventions/:id/action` | Session | `counsellor` (Tier 1) | Target case & intervention (Admin: blocked `403`) | Intervention state transitions (`accept`, `assign`, `contact`, `complete`, etc.) |
+| `GET` | `/api/admin/summary` | Session | `admin` (Tier 2) | National aggregate (Counsellor: blocked `403`) | High-level metrics with small-cell suppression ($k < 5$); zero individual PII |
+| `GET` | `/api/admin/trends` | Session | `admin` (Tier 2) | National aggregate (Counsellor: blocked `403`) | Cohort risk band distributions & trend directions with $k < 5$ suppression |
+| `GET` | `/api/admin/geography` | Session | `admin` (Tier 2) | National/State/District aggregate (Counsellor: blocked `403`) | Geographic drill-down with $k < 5$ small-cell masking |
+| `GET` | `/api/admin/audit` | Session | `admin` (Tier 2) | Administrative tier (Counsellor: blocked `403`) | Administrative audit trail (shielded case identifiers) |
+| `GET` | `/api/export/case/:caseId` | Session | `counsellor`, `admin` | Target case | Printable plaintext case summary report |
+| `GET` | `/api/export/national` | Session | `admin` only | National aggregate | Printable plaintext national overview report |
+| `POST` | `/api/dev/reset` | Dev-only | Public (dev mode only) | Full store | Re-seeds in-memory store with synthetic test personas (unmounted in production) |
 
 ### Detailed Router Specifications
 

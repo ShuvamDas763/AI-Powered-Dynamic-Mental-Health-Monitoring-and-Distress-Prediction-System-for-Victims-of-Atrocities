@@ -66,7 +66,73 @@ The platform enforces a cryptographic and architectural boundary between individ
 
 ---
 
-## 3. Storage Abstraction Interfaces
+## 3. Cross-Tier Operational Services Architecture
+
+While Sahara enforces a strict separation between Tier 1 (identified clinical case data for counsellors) and Tier 2 (anonymised aggregate data for administrators), several core operational services support victim empowerment, conversational triage, multi-channel outreach, and feedback loops:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    CROSS-TIER OPERATIONAL SERVICES                          │
+├───────────────────┬───────────────────┬───────────────────┬─────────────────┤
+│ /api/checkin      │ /api/consent      │ /api/outreach     │ /api/notifs     │
+│ Victim check-in   │ Dynamic consent   │ Multi-channel     │ Non-clinical    │
+│ & crisis triage   │ & revocations     │ dispatch/fallback │ feedback loop   │
+└─────────┬─────────┴─────────┬─────────┴─────────┬─────────┴────────┬────────┘
+          │                   │                   │                  │
+          ▼                   ▼                   ▼                  ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Case Scoping: resolveAuthorizedCase(user, caseId) / requireVictim           │
+│ • Victims locked to own session caseId (403 on mismatch)                    │
+│ • Counsellors validated against case registry (404 if not found)            │
+│ • Administrators strictly BLOCKED (403 Forbidden on all operational routes) │
+└───────────────────────────────────────┬─────────────────────────────────────┘
+                                        │
+                    ┌───────────────────┴───────────────────┐
+                    ▼                                       ▼
+┌───────────────────────────────────────┐ ┌───────────────────────────────────┐
+│ Tier 1: Identified Clinical Consumer  │ │ Tier 2: Aggregate Consumer        │
+│ • Full longitudinal check-in history  │ │ • Anonymised projection inputs    │
+│ • Early-warning trajectory velocity   │ │ • No PII, no caseId, no raw text  │
+│ • Outreach continuity alerts (exhaust)│ │ • Score bands only (no raw scores)│
+│ • Intervention state management       │ │ • Small-cell k-anonymity (k < 5)  │
+└───────────────────────────────────────┘ └───────────────────────────────────┘
+```
+
+### 3.1 Operational Services Breakdown
+
+1. **Victim Conversational Check-In (`/api/checkin`)**:
+   - **Purpose**: Intake pipeline for structured check-in conversations. Performs deterministic emergency crisis detection first (bypassing LLM inference and consent checks to deliver immediate safety contacts: Tele-MANAS `14416`, `112`). For routine submissions, strictly enforces a pre-LLM server-authoritative consent gate (`purposes.monitoring === true`), updates longitudinal distress trajectories, extracts emotion and engagement signals, and stores check-in receipts.
+   - **Authorized Role**: `victim` exclusively (`requireVictim` middleware). Counsellors and administrators cannot write check-in records on a victim's behalf.
+   - **Case Scoping**: Strictly bound to `req.session.user.caseId`. Any attempt to post check-in data for a mismatched case ID is rejected with `403 Forbidden`.
+
+2. **Server-Authoritative Consent Management (`/api/consent`)**:
+   - **Purpose**: Victim self-service consent lifecycle management. Enforces safe opt-in defaults (all purposes default to `false`; communication channels default to `[]`). Supports granular consent purposes (`monitoring`, `communication`, `voice_analysis`) and communication channels (`web`, `app`, `sms`, `ivrs`). Allows instant, non-punitive revocation that immediately halts routine monitoring and outreach while recording an immutable audit log.
+   - **Authorized Roles**: `victim` (self-service) and `counsellor` (oversight and advocacy). Administrators are blocked with `403 Forbidden`.
+   - **Case Scoping**: Evaluated via `resolveAuthorizedCase()`. A victim can only read or update consent for their own `session.user.caseId` (`403 Forbidden` on mismatch). A counsellor must specify a valid registered case (`404 Not Found` if nonexistent).
+
+3. **Multi-Channel Outreach Orchestrator (`/api/outreach`)**:
+   - **Purpose**: Schedules and executes multi-channel check-in contact across authorized channels (`web`, `app`, `sms`, `ivrs`). Respects victim communication consent; applies consent-aware fallback channel progression (`APP -> SMS -> IVRS`, `WEB -> SMS -> IVRS`); enforces configurable retry delay timing (`nextAttemptAt = now + retryDelayMs`); and upon complete channel exhaustion transitions to `COUNSELLOR_FLAG` and generates an idempotent operational alert for human welfare review.
+   - **Authorized Roles**: `victim` (preference configuration) and `counsellor` (contact continuity monitoring). Administrators are blocked with `403 Forbidden`.
+   - **Case Scoping**: Evaluated via `resolveAuthorizedCase()`. Victims are restricted to their own `caseId`. Counsellors manage outreach for valid registered cases.
+
+4. **Victim Notifications (`/api/notifications`)**:
+   - **Purpose**: Provides a trauma-informed, non-clinical feedback loop ("Your check-in was reviewed by your support team") closing the communication loop so victims know their check-ins are acknowledged and supported. Contains zero clinical risk terminology, diagnostic labels, or case details.
+   - **Authorized Role**: `victim` exclusively (`requireVictim` middleware).
+   - **Case Scoping**: Strictly scoped to the authenticated session's `victimUsername`.
+
+### 3.2 Data Separation & Non-Leakage Guarantees
+
+- **No Administrator Access to Operational Routes**: Administrators attempting to call `/api/checkin`, `/api/consent`, `/api/outreach`, or `/api/notifications` are blocked with `403 Forbidden`.
+- **Decoupled Aggregate Projections**: Operational data feeds Tier 2 administrative reporting solely through server-side mathematical aggregation routines (`store.aggregateInputs()`, `store.getAggregateOutreachStats()`, `store.getInterventionStats()`). These routines project data into anonymous cohort buckets:
+  - Zero PII, pseudonyms, phone numbers, or free-text responses are included.
+  - Case identifiers are discarded before responses are serialized.
+  - Distress scores are mapped to coarse risk bands (`low`, `moderate`, `elevated`, `high`), preventing micro-targeting or individual reconstruction.
+  - Any cohort or geographic count fewer than 5 is automatically suppressed to `"<5"` ($k$-anonymity).
+- **Absolute Boundary Verification**: No operational endpoint bridges or leaks Tier 1 identified data into Tier 2. There are no polymorphic or shared endpoints that return identified records when invoked by administrative tokens.
+
+---
+
+## 4. Storage Abstraction Interfaces
 The backend decouples domain logic from persistence via explicit repository contracts defined in `server/src/store/repositoryInterfaces.js`:
 - `CaseRepository`: Retrieval and updating of cases and check-in series.
 - `ConsentRepository`: Retrieval, grant, and revocation of consent records.
@@ -75,7 +141,7 @@ The backend decouples domain logic from persistence via explicit repository cont
 
 ---
 
-## 4. Security Hardening
+## 5. Security Hardening
 - **CORS Allowlist**: Strictly binds origin to `CLIENT_ORIGIN` environment variable.
 - **Production Secret Validation**: In `production` environment, the server immediately halts if `SESSION_SECRET` is unset, default, or fewer than 32 characters.
 - **Sliding-Window Rate Limiting**: Zero-dependency memory-efficient rate limiting prevents credential brute-forcing (`/api/auth/login`) and automated flooding of check-in endpoints (`/api/checkin`).

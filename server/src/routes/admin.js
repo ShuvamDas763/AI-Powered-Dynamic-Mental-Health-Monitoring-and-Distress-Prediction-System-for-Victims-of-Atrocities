@@ -200,3 +200,21 @@ adminRouter.get('/geography', (req, res) => {
     groups: result,
   });
 });
+
+/**
+ * Administrative access audit trail (Tier 2 shielded).
+ */
+adminRouter.get('/audit', (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 100, 200);
+  const log = store.getAuditLog(limit);
+  res.json({
+    entries: log.map((e) => ({
+      timestamp: e.timestamp,
+      userId: e.userId,
+      role: e.role,
+      action: e.action,
+      caseId: e.caseId ? 'Case-Shielded' : null,
+      details: e.details,
+    })),
+  });
+});
