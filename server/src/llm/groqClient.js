@@ -484,3 +484,17 @@ export async function moderateText(text) {
 
   return { pass: true, failed: [], why: 'moderation model unavailable' };
 }
+
+/**
+ * Analysis Provider abstraction for spying, mocking, and test verification.
+ */
+export const analysisProvider = {
+  callCount: 0,
+  async analyseCheckIn(args) {
+    analysisProvider.callCount++;
+    return analyseCheckIn(args);
+  },
+  resetCallCount() {
+    analysisProvider.callCount = 0;
+  },
+};

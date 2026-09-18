@@ -133,6 +133,13 @@ export const config = Object.freeze({
      */
     minCellSize: intFromEnv('MIN_CELL_SIZE', 5),
   }),
+
+  outreach: Object.freeze({
+    /** Enable automatic background outreach scheduler. */
+    schedulerEnabled: boolFromEnv('OUTREACH_SCHEDULER_ENABLED', true),
+    /** Polling interval in ms for the outreach scheduler. */
+    schedulerIntervalMs: intFromEnv('OUTREACH_SCHEDULER_INTERVAL_MS', 60_000),
+  }),
 });
 
 /** Human-readable startup banner lines describing how the app is configured. */
@@ -144,5 +151,10 @@ export function describeConfig() {
       : `llm=live (timeout ${config.llm.timeoutMs}ms)`,
   );
   lines.push(`min-cell-size=${config.privacy.minCellSize}`);
+  lines.push(
+    config.outreach.schedulerEnabled
+      ? `outreach-scheduler=enabled (interval ${config.outreach.schedulerIntervalMs}ms)`
+      : 'outreach-scheduler=disabled',
+  );
   return lines;
 }

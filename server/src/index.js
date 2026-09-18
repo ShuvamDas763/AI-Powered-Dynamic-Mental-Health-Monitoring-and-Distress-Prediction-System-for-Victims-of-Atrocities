@@ -27,8 +27,17 @@ import { devRouter } from './routes/dev.js';
 import { consentRouter } from './routes/consent.js';
 import { outreachRouter } from './routes/outreach.js';
 import { authLimiter, checkinLimiter } from './access/rateLimiter.js';
+import { store } from './store/memoryStore.js';
+import { OutreachService } from './domain/outreachOrchestrator.js';
+import { OutreachScheduler } from './domain/outreachScheduler.js';
 
 const app = express();
+
+const outreachService = new OutreachService(store);
+const outreachScheduler = new OutreachScheduler(store, outreachService, {
+  enabled: config.outreach.schedulerEnabled,
+  intervalMs: config.outreach.schedulerIntervalMs,
+});
 
 app.use(express.json({ limit: '256kb' }));
 
@@ -113,8 +122,25 @@ app.use((err, req, res, _next) => {
   res.status(500).json({ error: 'Something went wrong handling that request.' });
 });
 
-app.listen(config.port, '0.0.0.0', () => {
+const server = app.listen(config.port, '0.0.0.0', () => {
   console.log(`\n  SIH26094 distress-monitoring server`);
   for (const line of describeConfig()) console.log(`    ${line}`);
   console.log(`\n  listening on http://0.0.0.0:${config.port}\n`);
+
+  if (config.outreach.schedulerEnabled) {
+    outreachScheduler.start();
+    console.log(`  [scheduler] automatic outreach scheduler running (every ${config.outreach.schedulerIntervalMs}ms)`);
+  }
 });
+
+function gracefulShutdown(signal) {
+  console.log(`\n  [shutdown] received ${signal}, closing server and stopping background scheduler...`);
+  outreachScheduler.stop();
+  server.close(() => {
+    console.log('  [shutdown] HTTP server closed cleanly.');
+    process.exit(0);
+  });
+}
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

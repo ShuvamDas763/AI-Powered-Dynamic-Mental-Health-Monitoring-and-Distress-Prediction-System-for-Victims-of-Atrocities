@@ -71,6 +71,11 @@ function buildWhyThisCaseIsHere(caseRecord, assessment, history = [], outreach =
     reasons.push(`${overdueCount} recommended intervention(s) overdue for action`);
   }
 
+  // 5. Contact continuity / outreach exhaustion
+  if (outreach?.deliveryState === 'COUNSELLOR_FLAG') {
+    reasons.push('Repeated unsuccessful contact across configured outreach channels (contact continuity review required)');
+  }
+
   // Default if list is empty
   if (reasons.length === 0) {
     if (assessment.band === 'high' || assessment.band === 'elevated') {
@@ -234,6 +239,7 @@ counsellorRouter.get('/cases/:caseId', (req, res) => {
     overdueInterventionsCount: overdueIntvs.length,
     counsellorStatus: deriveOperationalStatus(latest, intvs),
     whyThisCaseIsHere: buildWhyThisCaseIsHere(caseRecord, latest, history, outreach, intvs),
+    operationalAlerts: store.getOperationalAlerts ? store.getOperationalAlerts({ caseId }) : [],
   });
 });
 
@@ -270,11 +276,13 @@ counsellorRouter.post('/cases/:caseId/review', (req, res) => {
  */
 counsellorRouter.get('/alerts', (req, res) => {
   const alerts = store.alerts();
+  const operationalAlerts = store.getOperationalAlerts ? store.getOperationalAlerts({ status: 'active' }) : [];
   res.json({
     alerts: alerts.map((row) => {
       const history = store.getHistory(row.caseRecord.caseId);
       const outreach = store.getOutreachSchedule(row.caseRecord.caseId);
       const intvs = store.getInterventions(row.caseRecord.caseId);
+      const caseOpAlerts = operationalAlerts.filter((a) => a.caseId === row.caseRecord.caseId);
       return {
         caseRecord: {
           caseId: row.caseRecord.caseId,
@@ -297,9 +305,47 @@ counsellorRouter.get('/alerts', (req, res) => {
         nextCheckInDate: outreach?.nextCheckInDate ?? null,
         whyThisCaseIsHere: buildWhyThisCaseIsHere(row.caseRecord, row.assessment, history, outreach, intvs),
         counsellorStatus: deriveOperationalStatus(row.assessment, intvs),
+        operationalAlerts: caseOpAlerts,
       };
     }),
+    operationalAlerts,
   });
+});
+
+/**
+ * Operational alerts endpoint — contact continuity reviews.
+ */
+counsellorRouter.get('/operational-alerts', (req, res) => {
+  const { status, caseId, type } = req.query;
+  const filter = {};
+  if (status) filter.status = status;
+  if (caseId) filter.caseId = caseId;
+  if (type) filter.type = type;
+  const list = store.getOperationalAlerts ? store.getOperationalAlerts(filter) : [];
+  res.json({ operationalAlerts: list });
+});
+
+/**
+ * Resolve an operational alert.
+ */
+counsellorRouter.post('/operational-alerts/:id/resolve', (req, res) => {
+  const { id } = req.params;
+  const { note } = req.body ?? {};
+
+  const resolved = store.resolveOperationalAlert ? store.resolveOperationalAlert(id, note) : null;
+  if (!resolved) {
+    return res.status(404).json({ error: `Operational alert ${id} not found.` });
+  }
+
+  store.logAccess({
+    userId: req.session?.user?.username ?? 'counsellor',
+    role: req.session?.user?.role ?? 'counsellor',
+    action: 'resolve_operational_alert',
+    caseId: resolved.caseId,
+    details: { alertId: id, note },
+  });
+
+  res.json({ ok: true, alert: resolved });
 });
 
 /**

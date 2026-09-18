@@ -96,4 +96,120 @@ describe('Early-Warning Trajectory Engine', () => {
     assert.match(summary, /14–24 days/);
     assert.match(summary, /moderate evidence/);
   });
+
+  // ── P2-6 Specific Regression Tests ─────────────────────────────────
+
+  test('non-uniform timestamps: correctly computes empirical spacing without assuming 7 days', () => {
+    // 4 observations spaced 3 days, 10 days, 2 days apart -> total window is 15 days
+    const assessment = { score: 50, trend: { slope: 2.0, points: 4 } };
+    const history = [
+      { occurredAt: '2026-09-01T10:00:00Z' },
+      { occurredAt: '2026-09-04T10:00:00Z' }, // +3 days
+      { occurredAt: '2026-09-14T10:00:00Z' }, // +10 days
+      { occurredAt: '2026-09-16T10:00:00Z' }, // +2 days (total 15 days)
+    ];
+    const res = projectTrajectory(assessment, history);
+
+    assert.equal(res.projected, true);
+    assert.equal(res.observationWindowDays, 15);
+    // avg days per checkin is 15 / 3 = 5 days (not 7 days!)
+    // gap is 20, check-ins needed = 10, nominal days = 50 days.
+    assert.ok(res.estimatedWindowDays);
+    assert.ok(res.estimatedWindowDays.min > 0);
+    assert.ok(res.estimatedWindowDays.max > res.estimatedWindowDays.min);
+    assert.equal(Number.isNaN(res.estimatedWindowDays.min), false);
+    assert.equal(Number.isNaN(res.estimatedWindowDays.max), false);
+  });
+
+  test('missing timestamps: does NOT manufacture 7-day interval and returns safe insufficient state', () => {
+    // 5 observations but none have occurredAt timestamps
+    const assessment = { score: 50, trend: { slope: 2.0, points: 5 } };
+    const history = [
+      { status: 'completed' },
+      { status: 'completed' },
+      { status: 'completed' },
+      { status: 'completed' },
+      { status: 'completed' },
+    ];
+    const res = projectTrajectory(assessment, history);
+
+    assert.equal(res.projected, false);
+    assert.equal(res.predicted, false);
+    assert.equal(res.estimatedWindowDays, null);
+    assert.equal(res.estimatedDaysToThreshold, null);
+    assert.equal(res.estimatedDate, null);
+    assert.equal(res.evidenceQuality, 'insufficient');
+    assert.equal(res.confidence, 'low');
+    assert.match(res.reasoning, /Trajectory projection requires valid observation timing/i);
+    assert.equal(res.disclaimer, TRAJECTORY_DISCLAIMER);
+  });
+
+  test('invalid timestamps: returns safe no-projection state without crashing or inventing intervals', () => {
+    const assessment = { score: 50, trend: { slope: 2.0, points: 4 } };
+    const history = [
+      { occurredAt: 'not-a-valid-date' },
+      { occurredAt: null },
+      { occurredAt: undefined },
+      { occurredAt: 'invalid' },
+    ];
+    const res = projectTrajectory(assessment, history);
+
+    assert.equal(res.projected, false);
+    assert.equal(res.estimatedWindowDays, null);
+    assert.equal(res.evidenceQuality, 'insufficient');
+    assert.match(res.reasoning, /Trajectory projection requires valid observation timing/i);
+  });
+
+  test('only one usable timestamp: returns safe no-projection state', () => {
+    const assessment = { score: 50, trend: { slope: 2.0, points: 4 } };
+    const history = [
+      { occurredAt: '2026-09-01T10:00:00Z' },
+      { occurredAt: 'bad-date-1' },
+      { occurredAt: 'bad-date-2' },
+      { occurredAt: null },
+    ];
+    const res = projectTrajectory(assessment, history);
+
+    assert.equal(res.projected, false);
+    assert.equal(res.estimatedWindowDays, null);
+    assert.equal(res.evidenceQuality, 'insufficient');
+    assert.match(res.reasoning, /Trajectory projection requires valid observation timing/i);
+  });
+
+  test('flat trend (slope = 0): returns no projection with stable direction', () => {
+    const assessment = { score: 45, trend: { slope: 0, points: 4 } };
+    const history = [
+      { occurredAt: '2026-09-01T10:00:00Z' },
+      { occurredAt: '2026-09-08T10:00:00Z' },
+      { occurredAt: '2026-09-15T10:00:00Z' },
+      { occurredAt: '2026-09-22T10:00:00Z' },
+    ];
+    const res = projectTrajectory(assessment, history);
+
+    assert.equal(res.projected, false);
+    assert.equal(res.trajectoryDirection, 'stable');
+    assert.equal(res.estimatedWindowDays, null);
+    assert.match(res.reasoning, /trend is stable/i);
+  });
+
+  test('no NaN, no Infinity, and no negative numbers anywhere in output', () => {
+    // Extreme values
+    const assessment = { score: 69.9, trend: { slope: 0.00001, points: 4 } };
+    const history = [
+      { occurredAt: '2026-09-01T10:00:00Z' },
+      { occurredAt: '2026-09-02T10:00:00Z' },
+      { occurredAt: '2026-09-03T10:00:00Z' },
+      { occurredAt: '2026-09-04T10:00:00Z' },
+    ];
+    const res = projectTrajectory(assessment, history);
+
+    if (res.projected) {
+      assert.ok(Number.isFinite(res.estimatedWindowDays.min));
+      assert.ok(Number.isFinite(res.estimatedWindowDays.max));
+      assert.ok(res.estimatedWindowDays.min > 0);
+      assert.ok(res.estimatedWindowDays.max >= res.estimatedWindowDays.min);
+    } else {
+      assert.equal(res.estimatedWindowDays, null);
+    }
+  });
 });

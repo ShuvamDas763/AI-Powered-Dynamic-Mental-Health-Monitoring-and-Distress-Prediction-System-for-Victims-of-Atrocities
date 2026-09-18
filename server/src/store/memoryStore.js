@@ -63,6 +63,10 @@ export function createStore(options = {}) {
   const notifications = new Map();
   let notificationId = 0;
 
+  /** alertId -> OperationalAlertRecord. */
+  const operationalAlerts = new Map();
+  let operationalAlertId = 0;
+
   /** Audit trail — who accessed what, when. */
   const auditLog = [];
 
@@ -482,6 +486,80 @@ export function createStore(options = {}) {
       };
     },
 
+    // ── Operational Alerts Repository (Contact Continuity) ─────────────
+
+    /**
+     * Create an operational alert (e.g. outreach exhaustion).
+     * Idempotent: If an active (unresolved) alert already exists for the same
+     * caseId and type, updates its metadata instead of creating duplicate alerts.
+     */
+    createOperationalAlert(alertData) {
+      if (!alertData?.caseId) throw new Error('Operational alert requires a caseId');
+      const now = new Date().toISOString();
+
+      // Check for existing unresolved alert for this case and type
+      for (const alert of operationalAlerts.values()) {
+        if (alert.caseId === alertData.caseId && alert.type === alertData.type && alert.status === 'active') {
+          alert.updatedAt = now;
+          if (alertData.missedStreak !== undefined) alert.missedStreak = alertData.missedStreak;
+          if (alertData.lastAttemptedChannel) alert.lastAttemptedChannel = alertData.lastAttemptedChannel;
+          if (alertData.attemptedChannels) alert.attemptedChannels = alertData.attemptedChannels;
+          if (alertData.urgency) alert.urgency = alertData.urgency;
+          return { alert, created: false };
+        }
+      }
+
+      const alert = {
+        id: `op-alert-${++operationalAlertId}`,
+        caseId: alertData.caseId,
+        type: alertData.type || 'outreach_exhausted',
+        reason: alertData.reason || 'Repeated unsuccessful contact across configured outreach channels.',
+        urgency: alertData.urgency || 'medium',
+        source: alertData.source || 'outreach_orchestrator',
+        missedStreak: alertData.missedStreak ?? 1,
+        attemptedChannels: alertData.attemptedChannels || ['app', 'sms', 'ivrs'],
+        lastAttemptedChannel: alertData.lastAttemptedChannel || 'app',
+        status: 'active',
+        createdAt: now,
+        updatedAt: now,
+        resolvedAt: null,
+        resolutionNote: null,
+      };
+
+      operationalAlerts.set(alert.id, alert);
+      return { alert, created: true };
+    },
+
+    /**
+     * Get operational alerts, newest first. Optional filter by caseId, status, or type.
+     */
+    getOperationalAlerts(filter = {}) {
+      let list = [...operationalAlerts.values()];
+      if (filter.caseId) {
+        list = list.filter((a) => a.caseId === filter.caseId);
+      }
+      if (filter.status) {
+        list = list.filter((a) => a.status === filter.status);
+      }
+      if (filter.type) {
+        list = list.filter((a) => a.type === filter.type);
+      }
+      return list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    },
+
+    /**
+     * Resolve an operational alert.
+     */
+    resolveOperationalAlert(alertId, resolutionNote = '') {
+      const alert = operationalAlerts.get(alertId);
+      if (!alert) return null;
+      alert.status = 'resolved';
+      alert.resolvedAt = new Date().toISOString();
+      alert.resolutionNote = resolutionNote || 'Resolved by counsellor';
+      alert.updatedAt = alert.resolvedAt;
+      return alert;
+    },
+
     /**
      * DEV ONLY — Reset the store to its initial seed state.
      * Clears all live check-ins and rebuilds from the persona declarations.
@@ -491,7 +569,9 @@ export function createStore(options = {}) {
       consents.clear();
       interventions.clear();
       outreaches.clear();
+      operationalAlerts.clear();
       interventionId = 0;
+      operationalAlertId = 0;
 
       for (const { caseRecord, history } of buildPersonaCases({ now: seedClock })) {
         seedCase(caseRecord, history);

@@ -20,7 +20,7 @@
 import { Router } from 'express';
 import { requireVictim } from '../access/requireRole.js';
 import { store } from '../store/memoryStore.js';
-import { analyseCheckIn, generateFollowUp, generateCrisisFollowUp } from '../llm/groqClient.js';
+import { analysisProvider, generateFollowUp, generateCrisisFollowUp } from '../llm/groqClient.js';
 import { SPEAKER } from '../domain/records.js';
 import { detectCrisisInCheckIn } from '../safety/crisisDetection.js';
 import { getCrisisResponse } from '../safety/crisisResponse.js';
@@ -63,15 +63,14 @@ checkinRouter.post('/', async (req, res) => {
     return res.status(403).json({ error: 'You can only submit check-ins for your own case.' });
   }
 
-  // ── DUAL-ROUTE CRISIS DETECTION ──────────────────────────────────────────
+  // ── STEP 1: DETERMINISTIC CRISIS EVALUATION (EMERGENCY SAFETY PATH) ─────
   // Route 1 (Deterministic Pattern Engine): Fast regex check that guarantees
   // hard triggers fire even if offline, rate-limited, or in cached-fallback.
   const patternCrisis = detectCrisisInCheckIn(turns);
 
   // Check if a crisis referral was already delivered in a previous system turn.
   // This distinguishes Turn 1 (initial crisis trigger -> deliver Tele-MANAS referral)
-  // from Turns 2+ (ongoing in-crisis dialogue -> deliver context-aware de-escalation
-  // rather than looping the identical canned response).
+  // from Turns 2+ (ongoing in-crisis dialogue -> deliver context-aware de-escalation).
   const hasPriorCrisisReferral = turns.some(
     (t) => (t.speaker === SPEAKER.SYSTEM || t.speaker === 'system') && (
       (typeof t.text === 'string' && (
@@ -83,8 +82,108 @@ checkinRouter.post('/', async (req, res) => {
     ),
   );
 
-  // Run the LLM analysis on the conversation.
-  const analysis = await analyseCheckIn({ turns, locale: locale ?? 'en' });
+  // Check server-side consent record
+  const consentRecord = store.getConsent(caseId);
+  const isConsentActive = Boolean(
+    consentRecord && !consentRecord.revokedAt && consentRecord.purposes?.monitoring !== false,
+  );
+
+  // EMERGENCY LIFE-SAFETY OVERRIDE:
+  // Emergency life-safety crisis response triggers regardless of routine monitoring consent state.
+  // A missing routine monitoring consent record must NEVER block emergency intervention.
+  if (patternCrisis.triggered) {
+    const crisisResult = {
+      triggered: true,
+      category: patternCrisis.category || 'explicit_intent',
+      categoryLabel: patternCrisis.categoryLabel || 'Immediate safety crisis detected',
+      urgency: patternCrisis.urgency || 'critical',
+      matchedText: patternCrisis.matchedText || 'Crisis expression',
+    };
+
+    const effectiveLocale = locale ?? caseRecord.preferredLocale ?? 'en';
+    const response = getCrisisResponse(effectiveLocale, crisisResult.category);
+    let followUp;
+
+    if (!hasPriorCrisisReferral) {
+      // Stage 1: Initial Crisis Trigger — authoritative QPR referral
+      followUp = response.steps.join('\n\n');
+    } else {
+      // Stage 2: Ongoing in-crisis conversation — empathetic de-escalation & active listening
+      followUp = await generateCrisisFollowUp({
+        turns,
+        locale: effectiveLocale,
+        category: crisisResult.category,
+      });
+    }
+
+    const crisisResponse = {
+      triggered: true,
+      ongoing: hasPriorCrisisReferral,
+      category: crisisResult.category,
+      categoryLabel: crisisResult.categoryLabel,
+      urgency: crisisResult.urgency,
+      matchedText: crisisResult.matchedText,
+      helpline: response.helpline,
+      counsellorNote: response.counsellorNote,
+    };
+
+    // Record check-in deterministically with acute distress markers
+    const assessment = store.appendCheckIn(caseId, {
+      turns: turns.map((t) => ({
+        speaker: t.speaker === SPEAKER.SYSTEM ? SPEAKER.SYSTEM : SPEAKER.PERSON,
+        text: String(t.text ?? ''),
+      })),
+      locale: effectiveLocale,
+      channel: channel ?? 'app',
+      surfaceSentiment: 95,
+      signals: ['crisis_detected'],
+      signalPhrases: [crisisResult.matchedText],
+      immediateReviewRequested: true,
+      provenance: 'deterministic_crisis_guard',
+      consentAcknowledged: isConsentActive,
+      crisisDetected: true,
+      crisisMetadata: {
+        category: crisisResult.category,
+        categoryLabel: crisisResult.categoryLabel,
+        urgency: crisisResult.urgency,
+        matchedText: crisisResult.matchedText,
+      },
+    });
+
+    store.addNotification(req.victimUsername, {
+      caseId,
+      type: 'checkin_received',
+      message: 'Your response has been recorded. Sahara remembers where you left off.',
+    });
+
+    return res.json({
+      ok: true,
+      assessment,
+      analysis: {
+        notes: 'Emergency safety protocol triggered deterministically. High-priority support escalation active.',
+        provenance: { source: 'deterministic_crisis_guard', model: 'deterministic-rules' },
+      },
+      followUp,
+      crisisResponse,
+    });
+  }
+
+  // ── STEP 2: ENFORCE ROUTINE MONITORING CONSENT BEFORE LLM ANALYSIS ────────
+  // A routine check-in without active monitoring consent must NEVER reach:
+  // - LLM analysis
+  // - external model provider
+  // - cached LLM analysis
+  // - non-essential AI processing
+  if (!isConsentActive) {
+    return res.status(403).json({
+      error: 'Active monitoring consent is required to submit routine check-ins. Please review and grant consent in settings.',
+      consentRequired: true,
+    });
+  }
+
+  // ── STEP 3: ROUTINE ANALYSIS VIA LLM PROVIDER ────────────────────────────
+  // Consent is verified active — proceed with analysis provider
+  const analysis = await analysisProvider.analyseCheckIn({ turns, locale: locale ?? 'en' });
 
   // Route 2 (Semantic AI Classifier): Deep intent & metaphor comprehension.
   // Catches indirect self-harm ideation, veiled thoughts of death, or novel
@@ -93,24 +192,11 @@ checkinRouter.post('/', async (req, res) => {
     analysis.surfaceSentiment >= 85 && analysis.signals.includes('hopelessness')
   );
 
-  const crisisTriggered = patternCrisis.triggered || isSemanticCrisis;
-  const crisisCategory = patternCrisis.category || 'explicit_intent';
-  const crisisCategoryLabel = patternCrisis.categoryLabel || 'Semantic self-harm or acute crisis detected by AI';
-  const crisisUrgency = patternCrisis.urgency || (analysis.surfaceSentiment >= 90 ? 'critical' : 'high');
-  const crisisMatchedText = patternCrisis.matchedText || analysis.signalPhrases?.[0] || 'Semantic crisis evaluation';
-
-  // ── SERVER-AUTHORITATIVE CONSENT VERIFICATION ──────────────────────────
-  // Routine monitoring requires active server-side consent.
-  // Emergency life-safety crisis response triggers regardless of consent state.
-  const consentRecord = store.getConsent(caseId);
-  const isConsentActive = consentRecord && !consentRecord.revokedAt && consentRecord.purposes?.monitoring !== false;
-
-  if (!isConsentActive && !crisisTriggered) {
-    return res.status(403).json({
-      error: 'Active monitoring consent is required to submit routine check-ins. Please review and grant consent in settings.',
-      consentRequired: true,
-    });
-  }
+  const crisisTriggered = isSemanticCrisis;
+  const crisisCategory = 'explicit_intent';
+  const crisisCategoryLabel = 'Semantic self-harm or acute crisis detected by AI';
+  const crisisUrgency = analysis.surfaceSentiment >= 90 ? 'critical' : 'high';
+  const crisisMatchedText = analysis.signalPhrases?.[0] || 'Semantic crisis evaluation';
 
   const crisisResult = {
     triggered: crisisTriggered,
@@ -133,7 +219,7 @@ checkinRouter.post('/', async (req, res) => {
     signalPhrases: analysis.signalPhrases,
     immediateReviewRequested: crisisResult.triggered ? true : false,
     provenance: analysis.provenance.source,
-    consentAcknowledged: Boolean(isConsentActive),
+    consentAcknowledged: true,
     crisisDetected: crisisResult.triggered,
     crisisMetadata: crisisResult.triggered ? {
       category: crisisResult.category,
@@ -143,10 +229,6 @@ checkinRouter.post('/', async (req, res) => {
     } : null,
   });
 
-  // Generate a follow-up:
-  // - If crisis triggered for the FIRST time: deliver initial Tele-MANAS referral + support notice.
-  // - If crisis was ALREADY referred: deliver context-aware de-escalation & active listening.
-  // - Otherwise: normal conversational follow-up.
   let followUp;
   let crisisResponse = null;
 
@@ -155,7 +237,6 @@ checkinRouter.post('/', async (req, res) => {
     const response = getCrisisResponse(effectiveLocale, crisisResult.category);
 
     if (!hasPriorCrisisReferral) {
-      // Stage 1: Initial Crisis Trigger — authoritative QPR referral
       followUp = response.steps.join('\n\n');
       crisisResponse = {
         triggered: true,
@@ -168,7 +249,6 @@ checkinRouter.post('/', async (req, res) => {
         counsellorNote: response.counsellorNote,
       };
     } else {
-      // Stage 2: Ongoing in-crisis conversation — empathetic de-escalation & active listening
       followUp = await generateCrisisFollowUp({
         turns,
         locale: effectiveLocale,

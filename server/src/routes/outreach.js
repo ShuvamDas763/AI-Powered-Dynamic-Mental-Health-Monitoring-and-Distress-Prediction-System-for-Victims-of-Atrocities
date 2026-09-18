@@ -14,6 +14,7 @@ import { requireAuth } from '../access/requireRole.js';
 import { store } from '../store/memoryStore.js';
 import { OutreachService, OUTREACH_STATE, CHANNELS } from '../domain/outreachOrchestrator.js';
 import { ROLES } from '../access/roles.js';
+import { resolveAuthorizedCase } from '../access/caseAuthorization.js';
 
 export const outreachRouter = Router();
 
@@ -29,17 +30,12 @@ outreachRouter.get('/:caseId', (req, res) => {
   const { caseId } = req.params;
   const user = req.session.user;
 
-  // Tier separation: admin cannot access identified outreach data
-  if (user.role === ROLES.ADMIN) {
-    return res.status(403).json({ error: 'Aggregate role cannot view individual outreach schedules.' });
+  const auth = resolveAuthorizedCase(user, caseId);
+  if (!auth.authorized) {
+    return res.status(auth.status).json({ error: auth.error });
   }
 
-  // Victim can only access their own case
-  if (user.role === ROLES.VICTIM && user.caseId !== caseId) {
-    return res.status(403).json({ error: 'You can only view your own outreach schedule.' });
-  }
-
-  const schedule = store.getOutreachSchedule(caseId);
+  const schedule = store.getOutreachSchedule(auth.caseId);
   if (!schedule) {
     return res.status(404).json({ error: 'Outreach schedule not found for case.' });
   }
@@ -58,12 +54,13 @@ outreachRouter.post('/schedule', (req, res) => {
   const user = req.session.user;
   const { caseId, nextCheckInDate, preferredChannel } = req.body ?? {};
 
-  const targetCaseId = user.role === ROLES.VICTIM ? user.caseId : caseId;
-  if (!targetCaseId) {
-    return res.status(400).json({ error: 'Valid caseId is required.' });
+  const requestedCaseId = user.role === ROLES.VICTIM ? (caseId || user.caseId) : caseId;
+  const auth = resolveAuthorizedCase(user, requestedCaseId);
+  if (!auth.authorized) {
+    return res.status(auth.status).json({ error: auth.error });
   }
 
-  const schedule = outreachService.scheduleCheckin(targetCaseId, {
+  const schedule = outreachService.scheduleCheckin(auth.caseId, {
     nextCheckInDate,
     preferredChannel,
   });
@@ -76,20 +73,20 @@ outreachRouter.post('/schedule', (req, res) => {
  */
 outreachRouter.post('/:id/simulate-delivery', async (req, res) => {
   const { id } = req.params;
+  const user = req.session.user;
   const { channelOverride, simulateFailure } = req.body ?? {};
 
-  // 'id' can be caseId
-  const caseRecord = store.getCase(id);
-  if (!caseRecord) {
-    return res.status(404).json({ error: `Case ${id} not found.` });
+  const auth = resolveAuthorizedCase(user, id);
+  if (!auth.authorized) {
+    return res.status(auth.status).json({ error: auth.error });
   }
 
-  const result = await outreachService.attemptDelivery(id, {
+  const result = await outreachService.attemptDelivery(auth.caseId, {
     channelOverride,
     simulateFailure: simulateFailure === true,
   });
 
-  const updatedSchedule = store.getOutreachSchedule(id);
+  const updatedSchedule = store.getOutreachSchedule(auth.caseId);
   res.json({ ok: true, result, schedule: updatedSchedule });
 });
 
@@ -98,14 +95,15 @@ outreachRouter.post('/:id/simulate-delivery', async (req, res) => {
  */
 outreachRouter.post('/:id/simulate-response', (req, res) => {
   const { id } = req.params;
+  const user = req.session.user;
   const { responseChannel, message } = req.body ?? {};
 
-  const caseRecord = store.getCase(id);
-  if (!caseRecord) {
-    return res.status(404).json({ error: `Case ${id} not found.` });
+  const auth = resolveAuthorizedCase(user, id);
+  if (!auth.authorized) {
+    return res.status(auth.status).json({ error: auth.error });
   }
 
-  const updated = outreachService.recordResponse(id, {
+  const updated = outreachService.recordResponse(auth.caseId, {
     responseChannel,
     message,
   });

@@ -63,49 +63,152 @@ export function projectTrajectory(assessment, history = [], caseRecord = null) {
   const validHistory = Array.isArray(history) ? history.filter((c) => c && typeof c === 'object') : [];
   const observations = validHistory.length > 0 ? validHistory.length : (trend.points || 0);
 
+function parseValidTimestamp(val) {
+  if (!val) return null;
+  if (typeof val !== 'string' && typeof val !== 'number') return null;
+  if (typeof val === 'string' && !/^\d{4}-\d{2}-\d{2}/.test(val.trim())) return null;
+  const t = new Date(val).getTime();
+  return Number.isFinite(t) && !Number.isNaN(t) ? t : null;
+}
+
   // Derive actual elapsed observation window from real timestamps
-  let observationWindowDays = 0;
+  let observationWindowDays = null;
   let missingCount = 0;
+  let hasValidWindow = false;
 
-  if (validHistory.length >= 2) {
-    const timestamps = validHistory
-      .map((c) => (c.occurredAt ? new Date(c.occurredAt).getTime() : null))
-      .filter((t) => Number.isFinite(t))
-      .sort((a, b) => a - b);
+  const validTimestamps = validHistory
+    .map((c) => parseValidTimestamp(c.occurredAt))
+    .filter((t) => t !== null)
+    .sort((a, b) => a - b);
 
-    if (timestamps.length >= 2) {
-      const elapsedMs = timestamps[timestamps.length - 1] - timestamps[0];
+  if (validTimestamps.length >= 2) {
+    const elapsedMs = validTimestamps[validTimestamps.length - 1] - validTimestamps[0];
+    if (elapsedMs > 0) {
       observationWindowDays = Math.max(1, Math.round(elapsedMs / (24 * 60 * 60 * 1000)));
-    } else {
-      observationWindowDays = Math.max(1, (observations - 1) * 7);
+      hasValidWindow = true;
     }
-    missingCount = validHistory.filter((c) => c.status === 'missed').length;
-  } else if (observations > 1) {
-    observationWindowDays = (observations - 1) * 7;
   }
+  missingCount = validHistory.filter((c) => c.status === 'missed').length;
 
   const missingnessRatio = observations > 0 ? Math.round((missingCount / observations) * 100) / 100 : 0;
 
   // Trajectory direction
   const trajectoryDirection = slope > 0.5 ? 'rising' : slope < -0.5 ? 'improving' : 'stable';
 
-  // Evaluate Evidence Quality
+  // Evaluate Evidence Quality (only if observation window is validly established)
   let evidenceQuality = 'insufficient';
   let confidence = 'low';
 
-  if (observations >= 6 && missingnessRatio <= 0.25) {
-    evidenceQuality = 'robust';
-    confidence = 'high';
-  } else if (observations >= 4 && missingnessRatio <= 0.40) {
-    evidenceQuality = 'moderate';
-    confidence = 'medium';
-  } else if (observations >= MIN_OBSERVATIONS_FOR_TRAJECTORY) {
-    evidenceQuality = 'preliminary';
-    confidence = 'low';
+  if (hasValidWindow) {
+    if (observations >= 6 && missingnessRatio <= 0.25) {
+      evidenceQuality = 'robust';
+      confidence = 'high';
+    } else if (observations >= 4 && missingnessRatio <= 0.40) {
+      evidenceQuality = 'moderate';
+      confidence = 'medium';
+    } else if (observations >= MIN_OBSERVATIONS_FOR_TRAJECTORY) {
+      evidenceQuality = 'preliminary';
+      confidence = 'low';
+    }
   }
 
-  // Guard: Insufficient data
+  // Guard 1: Insufficient observations count
   if (observations < MIN_OBSERVATIONS_FOR_TRAJECTORY) {
+    return {
+      projected: false,
+      predicted: false,
+      estimatedWindowDays: null,
+      estimatedDaysToThreshold: null,
+      estimatedDate: null,
+      trajectoryDirection,
+      evidenceQuality: 'insufficient',
+      confidence: 'low',
+      observations,
+      observationWindowDays: observationWindowDays ?? 0,
+      missingnessRatio,
+      reasoning: `Trajectory requires at least ${MIN_OBSERVATIONS_FOR_TRAJECTORY} observations (${observations} recorded).`,
+      courtDateOverlap: false,
+      courtDateRisk: false,
+      disclaimer: TRAJECTORY_DISCLAIMER,
+    };
+  }
+
+  // Guard 2: Already crossed threshold
+  if (score >= ESCALATION_THRESHOLD) {
+    return {
+      projected: false,
+      predicted: false,
+      estimatedWindowDays: null,
+      estimatedDaysToThreshold: 0,
+      estimatedDate: null,
+      trajectoryDirection,
+      evidenceQuality,
+      confidence: 'high',
+      observations,
+      observationWindowDays: observationWindowDays ?? 0,
+      missingnessRatio,
+      reasoning: `Case currently meets or exceeds the support-review threshold (score ${score} / threshold ${ESCALATION_THRESHOLD}). Active human review required.`,
+      courtDateOverlap: false,
+      courtDateRisk: false,
+      disclaimer: TRAJECTORY_DISCLAIMER,
+    };
+  }
+
+  // Guard 3: Improving or Stable
+  if (slope <= 0) {
+    return {
+      projected: false,
+      predicted: false,
+      estimatedWindowDays: null,
+      estimatedDaysToThreshold: null,
+      estimatedDate: null,
+      trajectoryDirection,
+      evidenceQuality,
+      confidence,
+      observations,
+      observationWindowDays: observationWindowDays ?? 0,
+      missingnessRatio,
+      reasoning: trajectoryDirection === 'improving'
+        ? 'Distress trend is improving across recent observations. No threshold crossing projected.'
+        : 'Distress trend is stable. Score remains consistently below the review threshold.',
+      courtDateOverlap: false,
+      courtDateRisk: false,
+      disclaimer: TRAJECTORY_DISCLAIMER,
+    };
+  }
+
+  // Guard 4: Missing or invalid timestamps (no defensible observation window)
+  // NEVER fabricate 7 days * observations when valid timestamps cannot establish window
+  if (!hasValidWindow || observationWindowDays === null || observationWindowDays <= 0) {
+    return {
+      projected: false,
+      predicted: false,
+      estimatedWindowDays: null,
+      estimatedDaysToThreshold: null,
+      estimatedDate: null,
+      trajectoryDirection,
+      evidenceQuality: 'insufficient',
+      confidence: 'low',
+      observations,
+      observationWindowDays: null,
+      missingnessRatio,
+      reasoning: 'Trajectory projection requires valid observation timing; no projection is generated without a defensible observation window.',
+      courtDateOverlap: false,
+      courtDateRisk: false,
+      disclaimer: TRAJECTORY_DISCLAIMER,
+    };
+  }
+
+  // Compute empirical check-in cadence (actual days between observations)
+  const intervalsCount = Math.max(1, validTimestamps.length - 1);
+  const avgDaysPerCheckin = Math.max(1, observationWindowDays / intervalsCount);
+
+  // Project distance to threshold
+  const gapToThreshold = ESCALATION_THRESHOLD - score;
+  const checkInsToThreshold = gapToThreshold / slope;
+  const nominalDays = checkInsToThreshold * avgDaysPerCheckin;
+
+  if (!Number.isFinite(nominalDays) || nominalDays <= 0) {
     return {
       projected: false,
       predicted: false,
@@ -118,79 +221,25 @@ export function projectTrajectory(assessment, history = [], caseRecord = null) {
       observations,
       observationWindowDays,
       missingnessRatio,
-      reasoning: `Trajectory requires at least ${MIN_OBSERVATIONS_FOR_TRAJECTORY} observations (${observations} recorded over ${observationWindowDays} days).`,
+      reasoning: 'Trajectory projection requires valid observation timing; no projection is generated without a defensible observation window.',
       courtDateOverlap: false,
       courtDateRisk: false,
       disclaimer: TRAJECTORY_DISCLAIMER,
     };
   }
 
-  // Guard: Already crossed threshold
-  if (score >= ESCALATION_THRESHOLD) {
-    return {
-      projected: false,
-      predicted: false,
-      estimatedWindowDays: null,
-      estimatedDaysToThreshold: 0,
-      estimatedDate: null,
-      trajectoryDirection,
-      evidenceQuality,
-      confidence: 'high',
-      observations,
-      observationWindowDays,
-      missingnessRatio,
-      reasoning: `Case currently meets or exceeds the support-review threshold (score ${score} / threshold ${ESCALATION_THRESHOLD}). Active human review required.`,
-      courtDateOverlap: false,
-      courtDateRisk: false,
-      disclaimer: TRAJECTORY_DISCLAIMER,
-    };
-  }
+  // Empirical uncertainty window (bounded interval: ±20% to ±40% based on evidence quality)
+  const uncertaintyFactor = evidenceQuality === 'robust' ? 0.20 : evidenceQuality === 'moderate' ? 0.30 : 0.40;
+  const minDays = Math.max(1, Math.round(nominalDays * (1 - uncertaintyFactor)));
+  const maxDays = Math.max(minDays + 1, Math.round(nominalDays * (1 + uncertaintyFactor)));
 
-  // Guard: Improving or Stable
-  if (slope <= 0) {
+  // Guard 5: Beyond maximum defensible horizon
+  if (minDays > MAX_HORIZON_DAYS) {
     return {
       projected: false,
       predicted: false,
       estimatedWindowDays: null,
       estimatedDaysToThreshold: null,
-      estimatedDate: null,
-      trajectoryDirection,
-      evidenceQuality,
-      confidence,
-      observations,
-      observationWindowDays,
-      missingnessRatio,
-      reasoning: trajectoryDirection === 'improving'
-        ? 'Distress trend is improving across recent observations. No threshold crossing projected.'
-        : 'Distress trend is stable. Score remains consistently below the review threshold.',
-      courtDateOverlap: false,
-      courtDateRisk: false,
-      disclaimer: TRAJECTORY_DISCLAIMER,
-    };
-  }
-
-  // Compute empirical check-in cadence (actual days between observations)
-  const avgDaysPerCheckin = observations > 1 && observationWindowDays > 0
-    ? Math.max(2, observationWindowDays / (observations - 1))
-    : 7;
-
-  // Project distance to threshold
-  const gapToThreshold = ESCALATION_THRESHOLD - score;
-  const checkInsToThreshold = gapToThreshold / slope;
-  const nominalDays = checkInsToThreshold * avgDaysPerCheckin;
-
-  // Empirical uncertainty window (bounded interval: ±25% to ±40% based on evidence quality)
-  const uncertaintyFactor = evidenceQuality === 'robust' ? 0.20 : evidenceQuality === 'moderate' ? 0.30 : 0.40;
-  const minDays = Math.max(3, Math.round(nominalDays * (1 - uncertaintyFactor)));
-  const maxDays = Math.max(minDays + 2, Math.round(nominalDays * (1 + uncertaintyFactor)));
-
-  // Guard: Beyond maximum defensible horizon
-  if (minDays > MAX_HORIZON_DAYS) {
-    return {
-      projected: false,
-      predicted: false,
-      estimatedWindowDays: { min: minDays, max: maxDays },
-      estimatedDaysToThreshold: minDays,
       estimatedDate: null,
       trajectoryDirection,
       evidenceQuality: 'preliminary',

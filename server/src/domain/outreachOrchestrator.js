@@ -266,6 +266,22 @@ export class OutreachService {
           });
         }
 
+        // Operational Counsellor Alert (P1-5): Contact continuity review
+        const attemptedChannels = [CHANNELS.APP, CHANNELS.SMS, CHANNELS.IVRS];
+        if (this.store.createOperationalAlert) {
+          this.store.createOperationalAlert({
+            caseId,
+            type: 'outreach_exhausted',
+            reason: 'Repeated unsuccessful contact across configured outreach channels.',
+            urgency: schedule.missedStreak >= 3 ? 'high' : 'medium',
+            source: 'outreach_orchestrator',
+            missedStreak: schedule.missedStreak,
+            attemptedChannels,
+            lastAttemptedChannel: schedule.lastAttemptedChannel,
+            status: 'active',
+          });
+        }
+
         // Auto-notify assigned counsellor / create internal review task
         if (caseRecord) {
           this.store.logAccess({
@@ -274,8 +290,9 @@ export class OutreachService {
             action: 'outreach_counsellor_flag',
             caseId,
             details: {
-              reason: 'Continuity review needed: scheduled outreach unacknowledged across channels',
+              reason: 'Repeated unsuccessful contact across configured outreach channels.',
               missedStreak: schedule.missedStreak,
+              lastAttemptedChannel: schedule.lastAttemptedChannel,
             },
           });
         }

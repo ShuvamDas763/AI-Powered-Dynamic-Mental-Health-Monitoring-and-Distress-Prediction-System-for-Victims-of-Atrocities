@@ -58,24 +58,25 @@ Two-tier access control:
 
 ## 5. Feature Scope — What to Build vs. What to Honestly Simulate
 
-| Feature (from official PS) | Build for real | How |
+| Feature (from official PS) | Build Status | Technical Scope & Implementation Realism |
 |---|---|---|
-| Chatbot check-in | ✅ Real | Conversational UI, LLM-driven, multi-turn |
-| Web portal | ✅ Real | Same app, browser-based |
-| SMS follow-up | 🟡 Simulate | Show as a channel option in UI; don't need real SMS gateway integration |
-| IVRS voice calls | 🟡 Simulate | Simplified call-flow demo screen; not live telephony infra |
-| Text NLP + Sentiment Analysis | ✅ Real | LLM-based sentiment/emotion extraction per check-in response |
-| Voice Stress Analytics / Emotion AI | ✅ Real (achievable) | Use an existing pretrained speech-emotion-recognition model (e.g., wav2vec2-based SER model from HuggingFace) — do not train your own |
-| Dynamic Distress Score + trend | ✅ Real | Composite score from sentiment + engagement pattern + flagged keywords, tracked over multiple check-ins, shown as a trend line |
-| Predictive escalation ("before crisis emerges") | 🟡 Real but honestly scoped | Rule-based / LLM-reasoned early-warning logic (rising distress trend + specific flagged patterns). **State explicitly in the pitch: this is a decision-support triage tool, not a clinically validated predictor** — no real labeled crisis-outcome data exists for any team to train on |
-| Automated alerts to counsellors/officials | ✅ Real | Threshold-based trigger + notification/routing logic |
-| Intervention recommendations | ✅ Real | Mapping table: distress category + priority-use-case tag → recommended action (counselling / medical / witness protection / relocation / financial aid / legal aid / rehabilitation). **Have the medical team refine this table** |
-| District/State/National dashboards | ✅ Real | Role-based aggregation views, drill-down from national → state → district |
-| Explainable AI | ✅ Real (near-automatic) | Show which specific factors (keywords, sentiment shift, engagement drop) drove a given score — LLM reasoning traces do this naturally |
-| Multilingual | ✅ Real | Use Bhashini or multilingual LLM prompting; demo 2 languages deeply (e.g., English + Hindi) rather than claiming broad shallow coverage |
-| Automated Case Prioritisation | ✅ Real | Ranking/queue logic: distress score × priority-use-case weighting (rape/gang rape, witness intimidation, caste violence = higher base sensitivity) |
-| Privacy / data security / legal compliance | 🟡 Real at architecture level | Implement real role-based access + anonymization + basic encryption. **Present as "designed for compliance," not "certified compliant"** — you cannot get real legal sign-off in a hackathon |
-| HRMS / NHAA live integration | 🔴 Do not attempt | Mock with synthetic data structured like a real NHAA docket export. Present live integration as Phase 2 roadmap |
+| Chatbot check-in | `IMPLEMENTED` | Multi-turn conversational interface with trauma-informed prompts and multi-stage crisis de-escalation protocol (QPR & PFA). |
+| Web portal | `IMPLEMENTED` | Responsive single-page application with distinct role-specific workflows (Victim self-scoped portal, Counsellor Tier 1 triage, Admin Tier 2 aggregate dashboard). |
+| SMS follow-up | `SIMULATED` | Deterministic multi-channel outreach state machine with automated retries and channel fallback; telecommunications carrier SMS gateway is simulated. |
+| IVRS voice calls | `SIMULATED` | Interactive voice response state machine, interval scheduling, and channel-fallback progression; live telephony infrastructure is simulated. |
+| Text NLP + Sentiment Analysis | `IMPLEMENTED` | Multi-component distress scoring, emotion extraction, and keyword/intent safety detection per check-in response (Groq LLM with deterministic offline fallback). |
+| Voice Stress Analytics / Emotion AI | `ROADMAP` | Post-hackathon architectural roadmap for speech-emotion recognition (SER via wav2vec2) on telephony; text NLP is fully implemented. |
+| Dynamic Distress Score + trend | `IMPLEMENTED` | 4-component composite score (sentiment, longitudinal engagement velocity, flagged keywords, docket sensitivity) tracked across check-ins. |
+| Predictive escalation ("before crisis emerges") | `PARTIAL` | Rule-based & LLM-reasoned longitudinal trajectory estimation (velocity over strictly bounded 14/30/60-day horizons with valid observation timestamps). **Decision-support triage only; no clinical diagnostic claims.** |
+| Automated alerts to counsellors/officials | `IMPLEMENTED` | Dual-route escalation (score $\ge 65$ or named hard triggers) plus operational review alerts upon outreach channel exhaustion; top-of-queue priority placement. |
+| Intervention recommendations | `IMPLEMENTED` | Closed-loop lifecycle tracking (recommended → approved → dispatched → completed) mapped directly to statutory Indian schemes & legal protections under the SC/ST Act. |
+| District/State/National dashboards | `IMPLEMENTED` | Strict Tier 2 role-based aggregate metrics with geographic drill-down (national → state → district) and $k < 5$ small-cell privacy suppression. |
+| Explainable AI | `IMPLEMENTED` | Full signal transparency: score breakdown, sentiment shifts, keyword triggers, court date proximity, and non-accusatory operational continuity flags. |
+| Multilingual | `IMPLEMENTED` | Dual-language support (English and Hindi) across check-in prompts, UI copy, crisis de-escalation scripts, and server-side responses. |
+| Automated Case Prioritisation | `IMPLEMENTED` | Docket-sensitivity weighted queue sorting with mandatory top-of-queue placement for escalated cases and operational review flags. |
+| Privacy / data security / legal compliance | `PARTIAL` | Server-authoritative 2-tier data boundary, pre-LLM consent gating, self-scoped access controls, and $k < 5$ cell suppression; designed for DPDP Act alignment (formal institutional certification pending). |
+| HRMS / NHAA live integration | `ROADMAP` | Synthetic seed schema structured like NHAA grievance dockets; live inter-agency API integration planned as a Phase 2 operational deployment. |
+
 
 ---
 
