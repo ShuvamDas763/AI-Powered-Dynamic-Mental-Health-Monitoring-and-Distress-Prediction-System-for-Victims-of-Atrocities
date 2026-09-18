@@ -213,7 +213,7 @@ export default function CaseDetail({ caseId, onBack }) {
                 {latestAssessment.score}
               </div>
               <div style={{ fontSize: '0.72rem', color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                Distress Score
+                Support Priority Index
               </div>
             </div>
           )}
@@ -248,6 +248,180 @@ export default function CaseDetail({ caseId, onBack }) {
             {caseRecord.contextNote}
           </p>
         )}
+      </div>
+
+      {/* Counsellor Triage: The 5 Core Questions (WHO, WHY, WHAT CHANGED, WHAT SHOULD I DO, WHEN TO FOLLOW UP) */}
+      <div className="card card-elevated animate-in animate-in-delay-1" style={{ marginTop: '1.25rem', borderLeft: '4px solid var(--accent)', background: 'var(--surface)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--line-faint)', paddingBottom: '0.65rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div>
+            <h2 style={{ fontSize: '1.1rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <span>📋</span> Triage Summary: At a Glance
+            </h2>
+            <span style={{ fontSize: '0.76rem', color: 'var(--ink-muted)' }}>
+              Core contextual answers for immediate human decision-support
+            </span>
+          </div>
+          <div style={{
+            fontSize: '0.72rem', fontWeight: 700, padding: '0.2rem 0.6rem', borderRadius: 'var(--radius-full)',
+            background: escalation.triggered ? 'var(--risk-high-bg)' : 'var(--risk-low-bg)',
+            color: escalation.triggered ? 'var(--risk-high)' : 'var(--risk-low)',
+            textTransform: 'uppercase', letterSpacing: '0.04em',
+          }}>
+            {escalation.triggered ? 'Requires Attention' : 'Active Monitoring'}
+          </div>
+        </div>
+
+        {/* The 5 Questions Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+          {/* WHO? */}
+          <div style={{ background: 'var(--surface-sunken)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-sm)' }}>
+            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>
+              1. WHO?
+            </div>
+            <strong style={{ fontSize: '0.94rem', color: 'var(--ink)' }}>{caseRecord.pseudonym}</strong>
+            <div style={{ fontSize: '0.78rem', color: 'var(--ink-soft)', marginTop: '0.2rem', lineHeight: 1.4 }}>
+              <div>{caseRecord.caseId} · {caseRecord.district}, {caseRecord.state}</div>
+              <div style={{ marginTop: '0.2rem' }}>
+                Stage: <strong>{STAGE_LABELS[caseRecord.caseStage] || caseRecord.caseStage}</strong> ({caseRecord.monthsSinceRegistration}mo)
+              </div>
+              <div style={{ color: 'var(--ink-muted)', fontSize: '0.74rem', marginTop: '0.15rem' }}>
+                Category: {caseRecord.priorityTags?.join(', ') || 'SC/ST Beneficiary'}
+              </div>
+            </div>
+          </div>
+
+          {/* WHY? */}
+          <div style={{ background: 'var(--surface-sunken)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-sm)' }}>
+            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: escalation.triggered ? 'var(--risk-high)' : 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>
+              2. WHY FLAGGED?
+            </div>
+            <div style={{ fontSize: '0.84rem', fontWeight: 600, color: escalation.triggered ? 'var(--risk-high)' : 'var(--ink)' }}>
+              {escalation.triggered && escalation.triggerReasons?.length > 0
+                ? escalation.triggerReasons.map(r => r.label).join('; ')
+                : explanation.headline || 'Routine scheduled support check-in.'}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--ink-muted)', marginTop: '0.3rem', lineHeight: 1.4 }}>
+              {caseRecord.contextNote ? `Docket Note: "${caseRecord.contextNote}"` : 'Within expected longitudinal baseline.'}
+            </div>
+          </div>
+
+          {/* WHAT CHANGED? */}
+          <div style={{ background: 'var(--surface-sunken)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-sm)' }}>
+            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>
+              3. WHAT CHANGED?
+            </div>
+            <div style={{ fontSize: '0.84rem', color: 'var(--ink-soft)', lineHeight: 1.45 }}>
+              {chartData.length >= 2 ? (
+                <>
+                  <div>
+                    Trend: <strong style={{ color: trend.direction === 'rising' ? 'var(--risk-high)' : trend.direction === 'improving' ? 'var(--risk-low)' : 'var(--ink)' }}>
+                      {trend.direction === 'rising' ? 'Concern rising' : trend.direction === 'improving' ? 'Well-being improving' : 'Holding stable'}
+                    </strong> ({Math.abs(Math.round(trend.delta))} pts delta across {trend.points} check-ins).
+                  </div>
+                  {mismatch.sustained && (
+                    <div style={{ marginTop: '0.2rem', color: 'var(--risk-moderate)', fontSize: '0.75rem', fontWeight: 600 }}>
+                      Discrepancy: Surface positive words but declining participation.
+                    </div>
+                  )}
+                  {explanation.signalPhrases?.length > 0 && (
+                    <div style={{ marginTop: '0.2rem', fontSize: '0.75rem', color: 'var(--ink-muted)', fontStyle: 'italic' }}>
+                      Recent phrase: "{explanation.signalPhrases[0]}"
+                    </div>
+                  )}
+                </>
+              ) : (
+                <span>First baseline check-in recorded. No longitudinal shift yet.</span>
+              )}
+            </div>
+          </div>
+
+          {/* WHAT SHOULD I DO? */}
+          <div style={{ background: 'var(--surface-sunken)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-sm)' }}>
+            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>
+              4. WHAT SHOULD I DO?
+            </div>
+            {(() => {
+              const displayList = interventionsList.length > 0 ? interventionsList : interventions;
+              const pending = displayList?.find(i => i.status === 'RECOMMENDED' || i.status === 'ACCEPTED') || displayList?.[0];
+              if (!pending) return <div style={{ fontSize: '0.82rem', color: 'var(--ink-muted)' }}>Continue regular monitoring cadence.</div>;
+
+              return (
+                <div>
+                  <strong style={{ fontSize: '0.85rem', color: 'var(--ink)' }}>{pending.label}</strong>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--ink-soft)', marginTop: '0.2rem', lineHeight: 1.35 }}>
+                    {pending.description}
+                  </div>
+                  <div style={{ marginTop: '0.45rem' }}>
+                    {pending.status === 'RECOMMENDED' && (
+                      <button
+                        className="btn btn-sm"
+                        disabled={actionBusy}
+                        onClick={() => handleInterventionAction(pending.id || pending.code, 'accept')}
+                        style={{ fontSize: '0.74rem', padding: '0.2rem 0.65rem' }}
+                      >
+                        ✓ Accept Recommendation
+                      </button>
+                    )}
+                    {pending.status === 'ACCEPTED' && (
+                      <button
+                        className="btn btn-sm"
+                        disabled={actionBusy}
+                        onClick={() => handleInterventionAction(pending.id || pending.code, 'assign', { assignedTo: 'District Welfare Officer' })}
+                        style={{ fontSize: '0.74rem', padding: '0.2rem 0.65rem' }}
+                      >
+                        Assign Welfare Officer
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* WHEN TO FOLLOW UP? */}
+          <div style={{ background: 'var(--surface-sunken)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-sm)' }}>
+            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: prediction.courtDateRisk ? 'var(--risk-high)' : 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>
+              5. WHEN TO FOLLOW UP?
+            </div>
+            <strong style={{ fontSize: '0.88rem', color: prediction.courtDateRisk ? 'var(--risk-high)' : 'var(--ink)' }}>
+              {prediction.courtDateRisk
+                ? '⚠️ Prior to Upcoming Court Date'
+                : escalation.triggered
+                  ? 'Within 24–48 Hours'
+                  : 'Next Scheduled Review (Weekly)'}
+            </strong>
+            <div style={{ fontSize: '0.76rem', color: 'var(--ink-soft)', marginTop: '0.25rem', lineHeight: 1.4 }}>
+              {prediction.courtDateRisk
+                ? 'Trajectory escalation window overlaps with scheduled hearing. Coordinate protection.'
+                : escalation.triggered
+                  ? 'Priority triage queue: Welfare officer contact recommended within 48h.'
+                  : 'Case trajectory is steady. Maintain weekly check-in schedule.'}
+            </div>
+          </div>
+        </div>
+
+        {/* Explicit Human-in-the-Loop Support Chain */}
+        <div style={{ marginTop: '1rem', borderTop: '1px solid var(--line-faint)', paddingTop: '0.75rem' }}>
+          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.45rem' }}>
+            Human-in-the-Loop Support Chain
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap', fontSize: '0.75rem' }}>
+            <span style={{ padding: '0.2rem 0.55rem', borderRadius: 'var(--radius-full)', background: 'var(--surface-deep)', color: 'var(--ink-muted)' }}>1. Check-in</span>
+            <span style={{ color: 'var(--ink-faint)' }}>→</span>
+            <span style={{ padding: '0.2rem 0.55rem', borderRadius: 'var(--radius-full)', background: 'var(--surface-deep)', color: 'var(--ink-muted)' }}>2. Pattern Noticed</span>
+            <span style={{ color: 'var(--ink-faint)' }}>→</span>
+            <span style={{ padding: '0.2rem 0.6rem', borderRadius: 'var(--radius-full)', background: 'var(--accent)', color: '#fff', fontWeight: 700 }}>3. Human Review (Active)</span>
+            <span style={{ color: 'var(--ink-faint)' }}>→</span>
+            <span style={{ padding: '0.2rem 0.55rem', borderRadius: 'var(--radius-full)', background: 'var(--surface-deep)', color: 'var(--ink-muted)' }}>4. Support Action</span>
+            <span style={{ color: 'var(--ink-faint)' }}>→</span>
+            <span style={{ padding: '0.2rem 0.55rem', borderRadius: 'var(--radius-full)', background: 'var(--surface-deep)', color: 'var(--ink-muted)' }}>5. Follow-up</span>
+            <span style={{ color: 'var(--ink-faint)' }}>→</span>
+            <span style={{ padding: '0.2rem 0.55rem', borderRadius: 'var(--radius-full)', background: 'var(--surface-deep)', color: 'var(--ink-muted)' }}>6. Outcome</span>
+          </div>
+          <p style={{ margin: '0.35rem 0 0', fontSize: '0.7rem', color: 'var(--ink-faint)', fontStyle: 'italic' }}>
+            AI provides early pattern recognition only. Human welfare officers remain entirely responsible for all support and care actions.
+          </p>
+        </div>
       </div>
 
       {/* Case Lifecycle Timeline Stepper */}
@@ -409,10 +583,10 @@ export default function CaseDetail({ caseId, onBack }) {
                     margin: '0 0 0.25rem',
                     color: prediction.courtDateRisk || (prediction.projectedWindow?.minDays <= 14) ? 'var(--risk-high)' : 'var(--risk-moderate)',
                   }}>
-                    Early-Warning Trajectory Projection
+                    Care Horizon & Longitudinal Trajectory
                   </h2>
                   <span style={{ fontSize: '0.78rem', color: 'var(--ink-muted)' }}>
-                    Empirical trajectory model based on {prediction.observationCount || checkIns.length} actual check-in observations over {prediction.observationWindowDays || 30} days
+                    Continuous support projection based on {prediction.observationCount || checkIns.length} check-ins over {prediction.observationWindowDays || 30} days, scheduled court hearings, and follow-up cadence
                   </span>
                 </div>
 
@@ -439,7 +613,7 @@ export default function CaseDetail({ caseId, onBack }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                   <div>
                     <div style={{ fontSize: '0.7rem', color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Projected Escalation Window
+                      Care Support Window
                     </div>
                     <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>
                       {prediction.projectedWindow?.windowText || `${prediction.estimatedDaysToThreshold} days`}

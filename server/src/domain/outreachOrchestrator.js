@@ -198,10 +198,15 @@ export class OutreachService {
     }
 
     try {
+      const isHindi = caseRecord?.preferredLocale === 'hi';
+      const promptMessage = isHindi
+        ? 'सहारा संबल: आपका नियमित संवाद उपलब्ध है। आप जब चाहें तब जुड़ सकते हैं।'
+        : 'Sahara Well-being: Your regular check-in is open. You can check in whenever you are ready.';
+
       const dispatchResult = await adapter.dispatch({
         caseId,
         recipientIdentifier: caseRecord?.victimUsername || 'victim',
-        message: 'Your regular Sahara well-being check-in is due. Please tap to connect.',
+        message: promptMessage,
         locale: caseRecord?.preferredLocale || 'en',
       });
 
@@ -235,6 +240,8 @@ export class OutreachService {
     const schedule = this.store.getOutreachSchedule(caseId);
     if (!schedule) return null;
 
+    const caseRecord = this.store.getCase(caseId);
+
     if (schedule.attemptCount < MAX_DELIVERY_ATTEMPTS) {
       // Step 1: Retry on same channel
       schedule.deliveryState = OUTREACH_STATE.RETRY;
@@ -246,19 +253,30 @@ export class OutreachService {
         schedule.preferredChannel = fallbackChannel;
         schedule.attemptCount = 0; // Reset for fallback channel
       } else {
-        // Step 3: All channels exhausted -> raise counsellor flag
+        // Step 3: All channels exhausted -> raise counsellor flag gently
         schedule.deliveryState = OUTREACH_STATE.COUNSELLOR_FLAG;
         schedule.missedStreak = (schedule.missedStreak || 0) + 1;
 
-        // Auto-notify assigned counsellor / create alert
-        const caseRecord = this.store.getCase(caseId);
+        // Gentle victim notification: Sahara remembers where you left off, no scolding
+        if (caseRecord?.victimUsername) {
+          this.store.addNotification(caseRecord.victimUsername, {
+            caseId,
+            type: 'outreach_gentle_missed',
+            message: 'We missed you. You can check in whenever you are ready.',
+          });
+        }
+
+        // Auto-notify assigned counsellor / create internal review task
         if (caseRecord) {
           this.store.logAccess({
             userId: 'system-outreach',
             role: 'system',
             action: 'outreach_counsellor_flag',
             caseId,
-            details: { reason, missedStreak: schedule.missedStreak },
+            details: {
+              reason: 'Continuity review needed: scheduled outreach unacknowledged across channels',
+              missedStreak: schedule.missedStreak,
+            },
           });
         }
       }

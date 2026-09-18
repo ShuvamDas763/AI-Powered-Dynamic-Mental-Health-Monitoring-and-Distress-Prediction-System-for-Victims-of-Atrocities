@@ -194,7 +194,7 @@ checkinRouter.post('/', async (req, res) => {
   store.addNotification(req.victimUsername, {
     caseId,
     type: 'checkin_received',
-    message: 'Your check-in has been received and is being reviewed.',
+    message: 'Your response has been recorded. Sahara remembers where you left off.',
   });
 
   res.json({

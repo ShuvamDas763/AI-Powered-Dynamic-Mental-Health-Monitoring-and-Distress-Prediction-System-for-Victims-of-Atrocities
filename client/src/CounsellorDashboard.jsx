@@ -188,7 +188,7 @@ export default function CounsellorDashboard({ onSelectCase, alertsOnly = false }
           <div className="stat-value">
             {cases.length > 0 ? Math.round(cases.reduce((s, c) => s + (c.assessment?.score ?? 0), 0) / cases.length) : 0}
           </div>
-          <div className="stat-label">Avg Distress Score</div>
+          <div className="stat-label">Avg Support Priority</div>
         </div>
       </div>
 

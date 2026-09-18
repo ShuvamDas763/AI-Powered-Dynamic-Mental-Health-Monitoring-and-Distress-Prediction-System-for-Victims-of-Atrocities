@@ -253,8 +253,8 @@ counsellorRouter.post('/cases/:caseId/review', (req, res) => {
 
   const { note } = req.body ?? {};
   const message = note
-    ? `Your check-in was reviewed by a welfare officer. Note: ${note}`
-    : 'Your check-in has been reviewed by a welfare officer. Thank you for sharing.';
+    ? `Your support team reviewed your check-in. Note: ${note}`
+    : 'Your support team has reviewed your recent check-in. Thank you for sharing.';
 
   store.addNotification(caseRecord.victimUsername, {
     caseId,

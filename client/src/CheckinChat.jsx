@@ -358,9 +358,9 @@ export default function CheckinChat({ user }) {
 
       {isConsentRevoked && (
         <div style={{
-          padding: '0.75rem 1rem',
-          background: 'var(--risk-moderate-bg)',
-          borderLeft: '4px solid var(--risk-moderate)',
+          padding: '0.85rem 1.15rem',
+          background: 'var(--warm-pale)',
+          borderLeft: '4px solid var(--accent)',
           borderRadius: 'var(--radius-sm)',
           marginBottom: '1rem',
           fontSize: '0.85rem',
@@ -368,17 +368,20 @@ export default function CheckinChat({ user }) {
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
-          gap: '0.5rem',
+          gap: '0.65rem',
         }}>
           <div>
-            <strong>Monitoring Consent Paused:</strong> You previously revoked routine well-being monitoring. Duty-of-care emergency support remains active.
+            <strong>{locale === 'hi' ? 'संवाद स्थगित है:' : 'Check-ins Paused:'}</strong>{' '}
+            {locale === 'hi'
+              ? 'सहारा याद रखता है कि आपने कहाँ छोड़ा था। जब भी आप तैयार महसूस करें, संवाद पुनः शुरू कर सकते हैं। आपातकालीन सहायता सदैव उपलब्ध है।'
+              : 'Sahara remembers where you left off. You can resume check-ins whenever you feel ready. 24/7 confidential helpline support remains available.'}
           </div>
           <button
             className="btn btn-sm"
             onClick={() => updateConsent(['monitoring', 'communication', 'voice_analysis'], [channel])}
-            style={{ fontSize: '0.78rem', padding: '0.25rem 0.65rem' }}
+            style={{ fontSize: '0.78rem', padding: '0.3rem 0.85rem' }}
           >
-            Resume Monitoring
+            {locale === 'hi' ? 'संवाद पुनः प्रारंभ करें' : 'Resume Check-ins'}
           </button>
         </div>
       )}
@@ -412,19 +415,22 @@ export default function CheckinChat({ user }) {
               </div>
             </div>
 
-            {/* Pinned Emergency SOS Banner */}
+            {/* Pinned Emergency SOS Banner - Calm, Non-Sensational */}
             {crisisActive && (
-              <div className="crisis-sos-banner" role="alert">
-                <div className="crisis-sos-header">
-                  <div className="crisis-sos-badge">
-                    <span className="crisis-pulsing-dot" />
-                    <span>{locale === 'hi' ? '🚨 संकट सहायता सक्रिय · परामर्शदाता को सूचित किया गया' : '🚨 Crisis Support Active · Counsellor Alerted'}</span>
+              <div className="crisis-sos-banner" role="alert" style={{ background: 'var(--warm-pale)', borderLeft: '4px solid var(--accent)', border: '1px solid rgba(184, 134, 11, 0.3)', padding: '0.9rem 1.1rem', borderRadius: 'var(--radius)' }}>
+                <div className="crisis-sos-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.65rem', marginBottom: '0.4rem' }}>
+                  <div className="crisis-sos-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', background: 'var(--surface)', padding: '0.25rem 0.65rem', borderRadius: 'var(--radius-full)', color: 'var(--ink)', fontSize: '0.84rem' }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block' }} />
+                    <span style={{ fontWeight: 700 }}>
+                      {locale === 'hi' ? 'आपको तुरंत सहायता की आवश्यकता हो सकती है' : 'You may need immediate support.'}
+                    </span>
                   </div>
-                  <div className="crisis-sos-actions">
+                  <div className="crisis-sos-actions" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <a
                       href="tel:14416"
                       className="btn-sos"
                       aria-label={locale === 'hi' ? 'Tele-MANAS को 14416 पर कॉल करें' : 'Call Tele-MANAS at 14416'}
+                      style={{ background: 'var(--accent)', color: '#fff', textDecoration: 'none', padding: '0.35rem 0.8rem', borderRadius: 'var(--radius-sm)', fontWeight: 600, fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
                     >
                       📞 {locale === 'hi' ? 'Tele-MANAS: 14416' : 'Call Tele-MANAS: 14416'}
                     </a>
@@ -432,6 +438,7 @@ export default function CheckinChat({ user }) {
                       href="tel:18008914416"
                       className="btn-sos-secondary"
                       title="Toll-free 1-800-891-4416"
+                      style={{ background: 'var(--surface)', color: 'var(--ink)', border: '1px solid var(--line)', textDecoration: 'none', padding: '0.35rem 0.7rem', borderRadius: 'var(--radius-sm)', fontWeight: 600, fontSize: '0.8rem' }}
                     >
                       1-800-891-4416
                     </a>
@@ -439,15 +446,16 @@ export default function CheckinChat({ user }) {
                       href="tel:112"
                       className="btn-sos-emergency"
                       title="National Emergency Helpline 112"
+                      style={{ background: 'var(--surface)', color: 'var(--risk-high)', border: '1px solid var(--risk-high)', textDecoration: 'none', padding: '0.35rem 0.7rem', borderRadius: 'var(--radius-sm)', fontWeight: 700, fontSize: '0.8rem' }}
                     >
-                      🚨 112
+                      Helpline 112
                     </a>
                   </div>
                 </div>
-                <p className="crisis-sos-desc">
+                <p className="crisis-sos-desc" style={{ color: 'var(--ink-soft)', margin: 0, fontSize: '0.82rem', lineHeight: 1.5 }}>
                   {locale === 'hi'
-                    ? 'हमारी सहायता टीम को सूचित कर दिया गया है। प्रशिक्षित परामर्शदाता 24/7 सहायता के लिए उपलब्ध हैं। आपको अकेले इससे नहीं गुज़रना है।'
-                    : 'A dedicated welfare officer has received an immediate alert and will follow up. Tele-MANAS counsellors are available 24/7 in your language.'}
+                    ? 'आप अकेले नहीं हैं। आपके कल्याण दल को सूचित किया गया है। प्रशिक्षित परामर्शदाता 24/7 निःशुल्क और पूर्णतः गोपनीय सहायता के लिए उपलब्ध हैं।'
+                    : 'You do not have to carry this alone. Dedicated counsellors are available right now to speak with you in complete confidence, and your welfare officer has received a support request.'}
                 </p>
               </div>
             )}
@@ -464,7 +472,7 @@ export default function CheckinChat({ user }) {
                   <div className={`chat-bubble ${m.speaker} ${m.isCrisis ? 'crisis-system' : ''}`}>
                     {m.isCrisis && (
                       <div className="crisis-msg-tag">
-                        🛡️ {locale === 'hi' ? 'सहायता एवं सुरक्षा' : 'Support & Safety'}
+                        🛡️ {locale === 'hi' ? 'संबल एवं सुरक्षा' : 'Immediate Care & Safety'}
                       </div>
                     )}
                     {m.text}
@@ -536,47 +544,89 @@ export default function CheckinChat({ user }) {
 
         {/* Right column: Supportive Care & Rights Suite */}
         <div className="checkin-sidebar-col">
-          {/* Supportive Care Status Card */}
+          {/* Human-Readable Timeline: WHAT HAPPENS NEXT */}
           <div className="card" style={{ padding: '1rem 1.15rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.65rem' }}>
-              <span style={{ fontSize: '1.2rem' }}>🌿</span>
-              <strong style={{ fontSize: '0.94rem', color: 'var(--ink)' }}>Your Supportive Care Plan</strong>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.55rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <span style={{ fontSize: '1.1rem' }}>🌱</span>
+                <strong style={{ fontSize: '0.88rem', color: 'var(--ink)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  {locale === 'hi' ? 'आगे क्या होगा' : 'What Happens Next'}
+                </strong>
+              </div>
+              <span style={{ fontSize: '0.7rem', color: 'var(--accent)', fontWeight: 600, background: 'var(--accent-pale)', padding: '0.12rem 0.5rem', borderRadius: 'var(--radius-full)' }}>
+                {locale === 'hi' ? 'सहारा संबल' : 'Support Path'}
+              </span>
             </div>
 
-            <p style={{ margin: '0 0 0.85rem', fontSize: '0.82rem', color: 'var(--ink-soft)', lineHeight: 1.5 }}>
-              You are enrolled in active well-being monitoring under the District SC/ST Welfare Cell.
-              Your entries are reviewed by your assigned welfare officer to ensure timely support and safety.
+            <p style={{ margin: '0 0 0.85rem', fontSize: '0.78rem', color: 'var(--ink-muted)', lineHeight: 1.45 }}>
+              {locale === 'hi'
+                ? 'सहारा याद रखता है कि आपने कहाँ छोड़ा था। आपकी जानकारी आपके नामित कल्याण अधिकारी के पास सुरक्षित रहती है।'
+                : 'Sahara remembers where you left off. Your responses remain confidential with your designated welfare officer.'}
             </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', fontSize: '0.8rem', background: 'var(--surface-sunken)', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-sm)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--ink-muted)' }}>Cadence:</span>
-                <strong>Weekly check-in schedule</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--ink-muted)' }}>Assigned Unit:</span>
-                <strong>District Atrocity Welfare Cell</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--ink-muted)' }}>Next Scheduled:</span>
-                <span style={{ color: 'var(--accent)', fontWeight: 600 }}>Active window</span>
-              </div>
-              {lastSubmittedAt && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--line)', paddingTop: '0.35rem', marginTop: '0.2rem' }}>
-                  <span style={{ color: 'var(--ink-muted)' }}>Last Check-in:</span>
-                  <span style={{ color: 'var(--risk-low)', fontWeight: 600 }}>✓ Logged {formatTime(lastSubmittedAt)}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              {/* Step 1: Today */}
+              <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'flex-start' }}>
+                <div style={{ width: 22, height: 22, borderRadius: '50%', background: lastSubmittedAt ? 'var(--risk-low)' : 'var(--accent)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 700, flexShrink: 0, marginTop: '0.1rem' }}>
+                  {lastSubmittedAt ? '✓' : '1'}
                 </div>
-              )}
+                <div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--ink)' }}>
+                    {locale === 'hi' ? 'आज: संवाद उपलब्ध' : 'Today: Check-in available'}
+                  </div>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--ink-muted)', lineHeight: 1.35 }}>
+                    {lastSubmittedAt
+                      ? (locale === 'hi' ? `संवाद दर्ज हुआ (${formatTime(lastSubmittedAt)})` : `Response recorded at ${formatTime(lastSubmittedAt)}`)
+                      : (locale === 'hi' ? 'अपनी गति से उत्तर दें। कोई जल्दबाज़ी नहीं है।' : 'Share thoughts at your own pace. There is no rush.')}
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 2: Support follow-up */}
+              <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'flex-start' }}>
+                <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--surface-deep)', color: 'var(--ink-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 700, flexShrink: 0, marginTop: '0.1rem' }}>
+                  2
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--ink)' }}>
+                    {locale === 'hi' ? 'आगामी: संबल समीक्षा' : 'Upcoming: Support follow-up'}
+                  </div>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--ink-muted)', lineHeight: 1.35 }}>
+                    {locale === 'hi'
+                      ? 'आपका कल्याण दल आपके समय के साथ आए परिवर्तनों की समीक्षा कर सकता है।'
+                      : 'Your support team may review changes over time and coordinate assistance.'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 3: Legal / Case Milestone */}
+              <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'flex-start' }}>
+                <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--surface-deep)', color: 'var(--ink-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 700, flexShrink: 0, marginTop: '0.1rem' }}>
+                  3
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--ink)' }}>
+                    {locale === 'hi' ? 'प्रक्रिया पड़ाव: नियत चरण' : 'Upcoming: Case milestone'}
+                  </div>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--ink-muted)', lineHeight: 1.35 }}>
+                    {locale === 'hi'
+                      ? 'विशेष न्यायालय व राहत योजना के अंतर्गत सुरक्षा एवं सहायता निरंतर है।'
+                      : 'Statutory review & relief coordination under SC/ST PoA Act protections.'}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Preferred Communication Channel */}
+          {/* Quiet Communication: Choose how Sahara communicates with you */}
           <div className="card" style={{ padding: '0.85rem 1rem' }}>
-            <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--ink)', marginBottom: '0.45rem' }}>
-              Preferred Outreach Channel
+            <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--ink)', marginBottom: '0.35rem' }}>
+              {locale === 'hi' ? 'सहारा आपसे कैसे संवाद करे' : 'Choose how Sahara communicates with you'}
             </div>
             <p style={{ fontSize: '0.76rem', color: 'var(--ink-muted)', margin: '0 0 0.6rem', lineHeight: 1.4 }}>
-              Choose how you prefer Sahara to send you gentle check-in reminders:
+              {locale === 'hi'
+                ? 'चुनें कि आप किस माध्यम से सहजता और शांति से संदेश प्राप्त करना चाहते हैं:'
+                : 'Select the channel that feels safest and most comfortable for gentle check-in reminders:'}
             </p>
             <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
               {CHANNELS.map((ch) => (
@@ -602,7 +652,7 @@ export default function CheckinChat({ user }) {
               ))}
             </div>
             <div style={{ fontSize: '0.72rem', color: 'var(--ink-faint)', marginTop: '0.5rem' }}>
-              {channel === 'sms' ? 'SMS Gateway: Check-in prompts delivered by text message.' : channel === 'ivrs' ? 'IVRS Voice: Automated scheduled voice call.' : channel === 'web' ? 'Web Portal: Browser-based check-in.' : 'Native App: Mobile application notifications.'}
+              {channel === 'sms' ? 'SMS: Discreet text message prompts.' : channel === 'ivrs' ? 'IVRS Voice: Scheduled automated audio call.' : channel === 'web' ? 'Web Portal: Browser-based check-in.' : 'App: Discreet mobile application reminders.'}
             </div>
           </div>
 
@@ -708,91 +758,122 @@ export default function CheckinChat({ user }) {
         </div>
       </div>
 
-      {/* Consent Modal */}
+      {/* Progressive Consent Modal — Centered on Victim Control & Dignity */}
       {showConsentModal && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 100, padding: '1rem',
+          background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 100, padding: '1rem', backdropFilter: 'blur(2px)',
         }}>
-          <div className="card" style={{ maxWidth: '32rem', width: '100%', padding: '1.5rem', animation: 'fadeIn 0.2s var(--ease-out)' }}>
-            <h3 style={{ margin: '0 0 0.5rem' }}>Consent & Privacy Preferences</h3>
-            <p style={{ fontSize: '0.85rem', color: 'var(--ink-muted)', marginBottom: '1.25rem', lineHeight: 1.5 }}>
-              Under the SC/ST (Prevention of Atrocities) Protection framework, you control what data is processed and how Sahara interacts with you.
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginBottom: '1.5rem' }}>
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem', cursor: 'pointer', fontSize: '0.85rem' }}>
-                <input
-                  type="checkbox"
-                  checked={consentRecord?.purposes?.includes('monitoring') ?? true}
-                  onChange={(e) => {
-                    const cur = consentRecord?.purposes || ['monitoring', 'communication'];
-                    const next = e.target.checked ? [...new Set([...cur, 'monitoring'])] : cur.filter((p) => p !== 'monitoring');
-                    updateConsent(next, [channel]);
-                  }}
-                  style={{ accentColor: 'var(--accent)', marginTop: '0.2rem' }}
-                />
-                <div>
-                  <strong>Well-being Monitoring</strong>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>
-                    Allows designated welfare officers to review check-ins and coordinate support.
-                  </div>
-                </div>
-              </label>
-
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem', cursor: 'pointer', fontSize: '0.85rem' }}>
-                <input
-                  type="checkbox"
-                  checked={consentRecord?.purposes?.includes('communication') ?? true}
-                  onChange={(e) => {
-                    const cur = consentRecord?.purposes || ['monitoring', 'communication'];
-                    const next = e.target.checked ? [...new Set([...cur, 'communication'])] : cur.filter((p) => p !== 'communication');
-                    updateConsent(next, [channel]);
-                  }}
-                  style={{ accentColor: 'var(--accent)', marginTop: '0.2rem' }}
-                />
-                <div>
-                  <strong>Periodic Outreach & Reminders</strong>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>
-                    Receive scheduled check-in reminders via your chosen channel (App, SMS, IVRS).
-                  </div>
-                </div>
-              </label>
-
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem', cursor: 'pointer', fontSize: '0.85rem' }}>
-                <input
-                  type="checkbox"
-                  checked={hasVoiceConsent}
-                  onChange={(e) => {
-                    const cur = consentRecord?.purposes || ['monitoring', 'communication'];
-                    const next = e.target.checked ? [...new Set([...cur, 'voice_analysis'])] : cur.filter((p) => p !== 'voice_analysis');
-                    updateConsent(next, [channel]);
-                  }}
-                  style={{ accentColor: 'var(--accent)', marginTop: '0.2rem' }}
-                />
-                <div>
-                  <strong>Voice Acoustic Analysis (Optional)</strong>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>
-                    Allows on-device acoustic pattern check. Raw audio is never stored or transmitted.
-                  </div>
-                </div>
-              </label>
+          <div className="card" style={{ maxWidth: '38rem', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '1.5rem', animation: 'fadeIn 0.2s var(--ease-out)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1.15rem' }}>
+                {locale === 'hi' ? 'आपकी सहमति एवं गोपनीयता नियंत्रण' : 'Your Consent & Privacy Controls'}
+              </h3>
+              <span style={{ fontSize: '0.72rem', color: 'var(--accent)', background: 'var(--accent-pale)', padding: '0.15rem 0.55rem', borderRadius: 'var(--radius-full)', fontWeight: 600 }}>
+                {locale === 'hi' ? 'पूर्णतः स्वैच्छिक' : 'Voluntary & In Your Control'}
+              </span>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--line-faint)', paddingTop: '1rem' }}>
+            <p style={{ fontSize: '0.82rem', color: 'var(--ink-soft)', marginBottom: '1rem', lineHeight: 1.5 }}>
+              {locale === 'hi'
+                ? 'अनुसूचित जाति एवं अनुसूचित जनजाति (अत्याचार निवारण) अधिनियम के अंतर्गत आप पूर्ण नियंत्रण में हैं। सहमति का उपयोग केवल आपको समय पर सहायता पहुँचाने के लिए किया जाता है।'
+                : 'Under the SC/ST (Prevention of Atrocities) Protection framework, you remain in complete control. Your participation is voluntary, and these controls determine how Sahara supports you.'}
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginBottom: '1.25rem' }}>
+              {/* Question 1 & 2: WHY & WHAT & WHO */}
+              <div style={{ padding: '0.85rem', background: 'var(--surface-sunken)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--line-faint)' }}>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem', cursor: 'pointer', fontSize: '0.86rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={consentRecord?.purposes?.includes('monitoring') ?? true}
+                    onChange={(e) => {
+                      const cur = consentRecord?.purposes || ['monitoring', 'communication'];
+                      const next = e.target.checked ? [...new Set([...cur, 'monitoring'])] : cur.filter((p) => p !== 'monitoring');
+                      updateConsent(next, [channel]);
+                    }}
+                    style={{ accentColor: 'var(--accent)', marginTop: '0.2rem' }}
+                  />
+                  <div>
+                    <strong>{locale === 'hi' ? 'संबल संवाद एवं कल्याण समीक्षा' : 'Well-being Dialogue & Support Review'}</strong>
+                    <div style={{ fontSize: '0.76rem', color: 'var(--ink-muted)', marginTop: '0.35rem', lineHeight: 1.45 }}>
+                      <div>• <strong>{locale === 'hi' ? 'क्यों (WHY):' : 'WHY:'}</strong> {locale === 'hi' ? 'ताकि आपका नामित कल्याण दल आपकी सहायता कर सके।' : 'So your designated district welfare officer can coordinate timely human support.'}</div>
+                      <div>• <strong>{locale === 'hi' ? 'क्या (WHAT):' : 'WHAT:'}</strong> {locale === 'hi' ? 'संवाद में आपके द्वारा साझा किए गए विचार। कोई कठोर अंकन नहीं।' : 'The thoughts and messages you choose to share. No automated punishments.'}</div>
+                      <div>• <strong>{locale === 'hi' ? 'किन्हें दिखेगा (WHO):' : 'WHO:'}</strong> {locale === 'hi' ? 'केवल आपके अधिकृत कल्याण अधिकारी को। उच्च अधिकारियों को केवल अनाम संख्यात्मक सारांश दिखता है।' : 'Only your assigned welfare officer. Administrators see only anonymous aggregate counts.'}</div>
+                    </div>
+                  </div>
+                </label>
+              </div>
+
+              {/* Question 4: WHICH CHANNELS */}
+              <div style={{ padding: '0.85rem', background: 'var(--surface-sunken)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--line-faint)' }}>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem', cursor: 'pointer', fontSize: '0.86rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={consentRecord?.purposes?.includes('communication') ?? true}
+                    onChange={(e) => {
+                      const cur = consentRecord?.purposes || ['monitoring', 'communication'];
+                      const next = e.target.checked ? [...new Set([...cur, 'communication'])] : cur.filter((p) => p !== 'communication');
+                      updateConsent(next, [channel]);
+                    }}
+                    style={{ accentColor: 'var(--accent)', marginTop: '0.2rem' }}
+                  />
+                  <div>
+                    <strong>{locale === 'hi' ? 'नियमित सौम्य संदेश' : 'Periodic Gentle Outreach & Reminders'}</strong>
+                    <div style={{ fontSize: '0.76rem', color: 'var(--ink-muted)', marginTop: '0.35rem', lineHeight: 1.45 }}>
+                      <div>• <strong>{locale === 'hi' ? 'माध्यम (CHANNELS):' : 'CHANNELS:'}</strong> {locale === 'hi' ? 'आप चुनते हैं: ऐप, एसएमएस, स्वचालित ध्वनि कॉल (IVRS), या वेब पोर्टल।' : 'You choose: Mobile App, SMS text, scheduled IVRS voice call, or Web portal.'}</div>
+                      <div>• <strong>{locale === 'hi' ? 'सौम्य नियम:' : 'GENTLE POLICY:'}</strong> {locale === 'hi' ? 'यदि आप उत्तर नहीं दे पाते हैं, तो सहारा आपको कभी दंडित या दोषी नहीं ठहराता।' : 'If you miss a check-in, Sahara never penalizes you; you can connect whenever you are ready.'}</div>
+                    </div>
+                  </div>
+                </label>
+              </div>
+
+              {/* Question 5: WHETHER VOICE */}
+              <div style={{ padding: '0.85rem', background: 'var(--surface-sunken)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--line-faint)' }}>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem', cursor: 'pointer', fontSize: '0.86rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={hasVoiceConsent}
+                    onChange={(e) => {
+                      const cur = consentRecord?.purposes || ['monitoring', 'communication'];
+                      const next = e.target.checked ? [...new Set([...cur, 'voice_analysis'])] : cur.filter((p) => p !== 'voice_analysis');
+                      updateConsent(next, [channel]);
+                    }}
+                    style={{ accentColor: 'var(--accent)', marginTop: '0.2rem' }}
+                  />
+                  <div>
+                    <strong>{locale === 'hi' ? 'वैकल्पिक ध्वनि पैटर्न जांच' : 'Voice Acoustic Pattern Check (Strictly Optional)'}</strong>
+                    <div style={{ fontSize: '0.76rem', color: 'var(--ink-muted)', marginTop: '0.35rem', lineHeight: 1.45 }}>
+                      <div>• <strong>{locale === 'hi' ? 'ध्वनि सुरक्षा (WHETHER VOICE):' : 'VOICE PRIVACY:'}</strong> {locale === 'hi' ? 'ध्वनि केवल आपके फोन के ब्राउज़र में ही जांची जाती है। ध्वनि कभी रिकॉर्ड, स्टोर या भेजी नहीं जाती।' : 'Processed exclusively on your device. Raw audio is never recorded, stored, or transmitted.'}</div>
+                    </div>
+                  </div>
+                </label>
+              </div>
+
+              {/* Question 6: HOW TO CHANGE */}
+              <div style={{ padding: '0.65rem 0.85rem', background: 'var(--warm-pale)', borderRadius: 'var(--radius-sm)', fontSize: '0.76rem', color: 'var(--ink-soft)', lineHeight: 1.45 }}>
+                ℹ️ <strong>{locale === 'hi' ? 'सहमति बदलना (HOW TO CHANGE):' : 'HOW TO CHANGE:'}</strong>{' '}
+                {locale === 'hi'
+                  ? 'आप जब चाहें तब सहमति वापस ले सकते हैं या बदल सकते हैं। इससे आपकी कानूनी सुरक्षा या मुआवजे पर कोई असर नहीं पड़ता। आपातकालीन सहायता (14416 / 112) हमेशा उपलब्ध रहती है।'
+                  : 'You can modify preferences or pause check-ins at any time. This never affects your legal rights, police protection, or statutory compensation. 24/7 helplines remain permanently accessible.'}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--line-faint)', paddingTop: '0.85rem' }}>
               <button
                 className="btn btn-ghost btn-sm"
                 onClick={revokeConsent}
-                style={{ color: 'var(--risk-high)' }}
+                style={{ color: 'var(--risk-high)', fontSize: '0.8rem' }}
               >
-                Revoke All Consent
+                {locale === 'hi' ? 'सभी संवाद रोकें' : 'Pause All Check-ins'}
               </button>
               <button
                 className="btn btn-sm"
                 onClick={() => setShowConsentModal(false)}
+                style={{ fontSize: '0.8rem', padding: '0.35rem 0.9rem' }}
               >
-                Save & Close
+                {locale === 'hi' ? 'सुरक्षित करें एवं बंद करें' : 'Save Preferences & Close'}
               </button>
             </div>
           </div>
