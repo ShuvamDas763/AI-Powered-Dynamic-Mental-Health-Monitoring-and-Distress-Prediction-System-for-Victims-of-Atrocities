@@ -102,14 +102,23 @@ function AppInner() {
     return () => window.removeEventListener('dev-navigate', handleDevNav);
   }, []);
 
-  async function signIn(username, passcode = 'demo') {
+  async function signIn(usernameOrPayload, passcode = 'demo') {
     setBusy(true);
-    await api('/auth/login', {
+    const payload =
+      typeof usernameOrPayload === 'object' && usernameOrPayload !== null
+        ? usernameOrPayload
+        : { username: usernameOrPayload, passcode };
+
+    const res = await api('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ username, passcode }),
+      body: JSON.stringify(payload),
     });
-    await refreshUser();
+
+    if (res.ok) {
+      await refreshUser();
+    }
     setBusy(false);
+    return res;
   }
 
   async function signOut() {
@@ -133,6 +142,12 @@ function AppInner() {
   const authorized = isAuthorizedForView(user, view);
   const effectiveView = authorized && view.page !== 'home' ? view : { page: defaultPage };
   const currentPage = effectiveView.page;
+
+  // URL security invariant: if URL hash is unauthorized (e.g. victim typing #/cases/0002),
+  // automatically overwrite hash with authoritative route (#/checkin)
+  if (!authorized && window.location.hash !== toHash({ page: defaultPage })) {
+    window.location.hash = toHash({ page: defaultPage });
+  }
 
   return (
     <div className="app-shell">

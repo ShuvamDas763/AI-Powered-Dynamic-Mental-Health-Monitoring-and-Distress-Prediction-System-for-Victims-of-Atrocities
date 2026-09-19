@@ -291,11 +291,20 @@ checkinRouter.post('/', async (req, res) => {
 
 /**
  * Get the check-in prompts available for a case, in the preferred language.
- * This is a convenience endpoint for the chatbot UI to know what to ask.
+ * Supports case-implicit routing (/prompts) and verified case routing (/prompts/:caseId).
  */
-checkinRouter.get('/prompts/:caseId', (req, res) => {
-  const { caseId } = req.params;
-  const caseRecord = store.getCase(caseId);
+checkinRouter.get(['/prompts', '/prompts/:caseId'], (req, res) => {
+  const targetCaseId = req.params.caseId || req.session?.user?.caseId;
+  if (!targetCaseId) {
+    return res.status(400).json({ error: 'No case linked to this session.' });
+  }
+
+  // Verify victim owns the requested case
+  if (!store.isOwnedBy(targetCaseId, req.victimUsername)) {
+    return res.status(403).json({ error: 'You can only access prompts for your own case.' });
+  }
+
+  const caseRecord = store.getCase(targetCaseId);
   if (!caseRecord) {
     return res.status(404).json({ error: 'Case not found.' });
   }
@@ -315,7 +324,7 @@ checkinRouter.get('/prompts/:caseId', (req, res) => {
   };
 
   res.json({
-    caseId,
+    caseId: targetCaseId,
     locale,
     prompts: prompts[locale] ?? prompts.en,
   });

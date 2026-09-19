@@ -13,6 +13,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useI18n } from './i18n.jsx';
 import { api } from './api.js';
 import VoicePatternIndicator from './VoicePatternIndicator.jsx';
 import {
@@ -55,7 +56,9 @@ function formatTime(date) {
 }
 
 export default function CheckinChat({ user }) {
-  const [selectedCase, setSelectedCase] = useState(() => user?.caseId || null);
+  const { t } = useI18n();
+  const selectedCase = user?.caseId || null;
+  const [hasStartedCheckin, setHasStartedCheckin] = useState(false);
   const [locale, setLocale] = useState(() => {
     const c = CASES.find((x) => x.caseId === user?.caseId);
     return c?.locale || 'en';
@@ -120,10 +123,6 @@ export default function CheckinChat({ user }) {
     }
   }, [selectedCase, fetchConsent]);
 
-  const availableCases = user?.caseId
-    ? CASES.filter((c) => c.caseId === user.caseId)
-    : CASES;
-
   useEffect(() => {
     messagesEnd.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -135,20 +134,6 @@ export default function CheckinChat({ user }) {
       setMessages([{ speaker: 'system', text: initialPrompt, time: new Date().toISOString() }]);
     }
   }, [selectedCase, locale]);
-
-  function selectCase(caseId) {
-    const c = CASES.find((x) => x.caseId === caseId);
-    setSelectedCase(caseId);
-    setLocale(c?.locale ?? 'en');
-    setMessages([]);
-    setCrisisActive(false);
-    setLastSubmittedAt(null);
-
-    const initialPrompt = c?.locale === 'hi' ? INITIAL_PROMPTS_HI : INITIAL_PROMPTS_EN;
-    setTimeout(() => {
-      setMessages([{ speaker: 'system', text: initialPrompt, time: new Date().toISOString() }]);
-    }, 300);
-  }
 
   async function updateConsent(purposesInput, channels) {
     if (!selectedCase) return;
@@ -331,119 +316,100 @@ export default function CheckinChat({ user }) {
     );
   }
 
-  // Case Selection View (if no case selected)
-  if (!selectedCase) {
+  // Post-Verification Experience (Section 10):
+  // Complainant sees their case-specific support briefing and continues into dialogue.
+  // The citizen NEVER browses or chooses other cases.
+  if (!hasStartedCheckin) {
     return (
-      <div>
-        <div className="page-header animate-in" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
-          <div>
-            <h1 style={{ fontFamily: 'var(--font-display)', color: 'var(--ink)' }}>
-              {locale === 'hi' ? 'गोपनीय कल्याण एवं संबल संवाद' : 'Confidential Well-being & Support Sanctuary'}
-            </h1>
-            <p style={{ maxWidth: '42rem', color: 'var(--ink-soft)', marginTop: '0.35rem' }}>
-              {locale === 'hi'
-                ? 'अपने नामित कल्याण अधिकारी से जुड़ें। आपकी बात पूर्णतः सुरक्षित है और अनुसूचित जाति/जनजाति सुरक्षा अधिनियम के अंतर्गत संरक्षित है।'
-                : 'Connect with your designated welfare officer for periodic support and protective assistance under SC/ST Act protections.'}
-            </p>
-          </div>
-
-          <div style={{ position: 'relative' }}>
-            <button
-              onClick={() => { setShowNotifications(!showNotifications); if (!showNotifications && unreadCount > 0) markRead(); }}
-              className="btn btn-secondary btn-sm"
-              aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
-              style={{ position: 'relative' }}
+      <div className="animate-in" style={{ maxWidth: '44rem', margin: '2rem auto', padding: '0 1rem' }}>
+        <div
+          className="card card-elevated"
+          style={{
+            padding: '2.5rem 2rem',
+            background: '#FFFFFF',
+            borderRadius: 'var(--radius-lg, 16px)',
+            border: '1px solid var(--line-faint, #EDE8E1)',
+            boxShadow: '0 10px 40px rgba(45, 30, 20, 0.06)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
+            <span
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: '50%',
+                background: 'var(--accent-pale, #F9ECE8)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--accent)',
+              }}
             >
-              <IconChat size={16} />
-              <span>{locale === 'hi' ? 'सूचनाएँ' : 'Messages'}</span>
-              {unreadCount > 0 && (
-                <span style={{
-                  background: 'var(--risk-high)',
-                  color: '#fff',
-                  borderRadius: 'var(--radius-full)',
-                  padding: '0.1rem 0.45rem',
-                  fontSize: '0.7rem',
-                  fontWeight: 700,
-                }}>
-                  {unreadCount}
-                </span>
-              )}
-            </button>
-            {showNotifications && (
-              <div className="card animate-in" style={{ position: 'absolute', top: 44, right: 0, width: 340, maxHeight: 420, overflowY: 'auto', zIndex: 60, boxShadow: 'var(--shadow-lg)' }}>
-                <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem' }}>{locale === 'hi' ? 'सूचनाएँ' : 'Notifications'}</h3>
-                {notifications.length === 0 ? (
-                  <p style={{ color: 'var(--ink-muted)', fontSize: '0.85rem', textAlign: 'center', padding: '1rem' }}>
-                    {locale === 'hi' ? 'कोई नई सूचना नहीं है।' : 'No notifications yet.'}
-                  </p>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {notifications.map((n) => (
-                      <div key={n.id} style={{
-                        padding: '0.65rem 0.85rem',
-                        borderRadius: 'var(--radius-sm)',
-                        background: n.readAt ? 'transparent' : 'var(--accent-pale)',
-                        fontSize: '0.85rem',
-                        lineHeight: 1.5,
-                        borderLeft: n.readAt ? 'none' : '3px solid var(--accent)',
-                      }}>
-                        <p style={{ margin: 0 }}>{n.message}</p>
-                        <span style={{ fontSize: '0.72rem', color: 'var(--ink-muted)' }}>
-                          {new Date(n.createdAt).toLocaleString()}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              <IconShield size={22} color="var(--accent)" />
+            </span>
+            <div>
+              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                {t('sahara.privateCaseAccess')}
               </div>
-            )}
+              <div style={{ fontSize: '0.9rem', color: 'var(--ink)', fontWeight: 600 }}>
+                {user?.displayName || 'Complainant A'}
+              </div>
+            </div>
           </div>
-        </div>
 
-        <div className="card card-elevated animate-in animate-in-delay-1" style={{ maxWidth: '56rem', padding: '2rem' }}>
-          <h2 style={{ fontSize: '1.2rem', margin: '0 0 0.4rem', color: 'var(--ink)' }}>
-            {locale === 'hi' ? 'अपना केस प्रोफाइल चुनें' : 'Select your case record to begin'}
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.75rem', color: 'var(--ink)', margin: '0 0 0.5rem', lineHeight: 1.25 }}>
+            {t('sahara.welcomeBack')}
           </h2>
-          <p style={{ color: 'var(--ink-muted)', margin: '0 0 1.5rem', fontSize: '0.88rem' }}>
-            {locale === 'hi'
-              ? 'संवाद प्रारंभ करने के लिए अपना विवरण चुनें:'
-              : 'Choose your case profile to start your confidential dialogue:'}
+          <p style={{ fontSize: '0.98rem', color: 'var(--ink-soft)', margin: '0 0 1.75rem', lineHeight: 1.55 }}>
+            {t('sahara.journeyReady')}
           </p>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1rem' }}>
-            {availableCases.map((c) => (
-              <button
-                key={c.caseId}
-                className="card card-interactive"
-                style={{ textAlign: 'left', padding: '1.15rem' }}
-                onClick={() => selectCase(c.caseId)}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                  <div style={{
-                    width: 42,
-                    height: 42,
-                    borderRadius: 'var(--radius-sm)',
-                    background: 'var(--accent)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '0.82rem',
-                    fontWeight: 700,
-                    color: '#fff',
-                    flexShrink: 0,
-                  }}>
-                    {c.locale === 'hi' ? 'अ' : 'En'}
-                  </div>
-                  <div>
-                    <strong style={{ fontSize: '0.96rem', color: 'var(--ink)' }}>{c.label}</strong>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--ink-muted)', marginTop: '0.15rem' }}>{c.desc}</div>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: 600, marginTop: '0.25rem', display: 'inline-block' }}>
-                      {c.caseId}
-                    </span>
-                  </div>
-                </div>
-              </button>
-            ))}
+          {/* Key Case Status Briefing */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+              gap: '1rem',
+              padding: '1.25rem',
+              background: 'var(--surface-sunken, #F8F5F0)',
+              borderRadius: 'var(--radius-md, 12px)',
+              border: '1px solid var(--line-faint, #EDE8E1)',
+              marginBottom: '1.75rem',
+            }}
+          >
+            <div>
+              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                {t('sahara.caseStageLabel')}
+              </div>
+              <div style={{ fontSize: '0.98rem', fontWeight: 700, color: 'var(--ink)', marginTop: '0.2rem' }}>
+                {locale === 'hi' ? 'न्यायालय विचारण (Proceedings)' : 'Proceedings'}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                {locale === 'hi' ? 'अगला संवाद' : 'Next Check-in'}
+              </div>
+              <div style={{ fontSize: '0.98rem', fontWeight: 700, color: 'var(--secondary, #2D5A46)', marginTop: '0.2rem' }}>
+                {locale === 'hi' ? 'आज (Today)' : 'Today'}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            <button
+              id="btn-continue-checkin"
+              onClick={() => setHasStartedCheckin(true)}
+              className="btn btn-primary-lg"
+              style={{ width: '100%', fontWeight: 700, padding: '0.85rem', textAlign: 'center' }}
+            >
+              {t('sahara.continueCheckin')} →
+            </button>
+
+            <div style={{ textAlign: 'center', fontSize: '0.78rem', color: 'var(--ink-muted)', lineHeight: 1.45 }}>
+              🔒 {locale === 'hi'
+                ? 'आपकी पहुंच केवल आपके सत्यापित केस से जुड़ी है। आप अन्य केस नहीं देख सकते।'
+                : 'Your access is linked to your verified case. You cannot browse other cases.'}
+            </div>
           </div>
         </div>
       </div>
@@ -478,13 +444,10 @@ export default function CheckinChat({ user }) {
         flexWrap: 'wrap',
         gap: '0.75rem',
       }}>
-        <button
-          className="back-link animate-in"
-          onClick={() => { setSelectedCase(null); setMessages([]); setCrisisActive(false); }}
-          style={{ margin: 0 }}
-        >
-          &larr; {locale === 'hi' ? 'केस बदलें' : 'Change case profile'}
-        </button>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', color: 'var(--ink-soft)' }}>
+          <span style={{ color: 'var(--accent)', fontWeight: 700 }}>🔒</span>
+          <span>{locale === 'hi' ? 'निजी संबल स्पेस · सत्यापित केस' : 'Private Support Space · Verified Case'}</span>
+        </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <button

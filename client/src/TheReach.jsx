@@ -12,7 +12,7 @@ import SaharaHandsScene from './SaharaHandsScene.jsx';
 import { IconPhone, IconShield, IconLock } from './GovernmentBranding.jsx';
 import { useI18n } from './i18n.jsx';
 
-export default function TheReach({ onBeginCheckin, onExploreHowItWorks }) {
+export default function TheReach({ onBeginSecureCheckin, onOpenStaffLogin, onExploreHowItWorks }) {
   const { locale, t } = useI18n();
 
   return (
@@ -121,23 +121,80 @@ export default function TheReach({ onBeginCheckin, onExploreHowItWorks }) {
               : 'A quiet digital layer that helps notice changing well-being, connect people with human support, and carry that support through the journey.'}
           </p>
 
-          <div style={{ display: 'flex', gap: '0.85rem', flexWrap: 'wrap', alignItems: 'center' }}>
-            <button
-              onClick={onBeginCheckin}
-              className="btn btn-primary-lg"
-              style={{ fontWeight: 700, gap: '0.6rem' }}
-            >
-              <IconShield size={18} />
-              <span>{locale === 'hi' ? 'संवाद प्रारंभ करें' : 'Begin Check-in'}</span>
-            </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', gap: '0.85rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <button
+                id="cta-begin-secure-checkin"
+                onClick={onBeginSecureCheckin}
+                className="btn btn-primary-lg"
+                style={{ fontWeight: 700, gap: '0.65rem' }}
+              >
+                <IconShield size={18} />
+                <span>{t('sahara.beginSecureCheckin')}</span>
+              </button>
 
-            <button
-              onClick={onExploreHowItWorks}
-              className="btn btn-secondary btn-primary-lg"
-              style={{ fontWeight: 600 }}
-            >
-              <span>{locale === 'hi' ? 'सहारा कैसे कार्य करता है' : 'How Sahara Works'}</span>
-            </button>
+              <button
+                onClick={onExploreHowItWorks}
+                className="btn btn-secondary btn-primary-lg"
+                style={{ fontWeight: 600 }}
+              >
+                <span>{locale === 'hi' ? 'सहारा कैसे कार्य करता है' : 'How Sahara Works'}</span>
+              </button>
+            </div>
+
+            {/* Subtle trust statement directly beneath canonical CTA */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginTop: '0.2rem' }}>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                fontSize: '0.78rem',
+                color: 'var(--ink-muted)',
+                lineHeight: 1.4,
+                flexWrap: 'wrap',
+              }}>
+                <span style={{
+                  fontWeight: 700,
+                  fontSize: '0.68rem',
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  color: 'var(--accent)',
+                  padding: '0.15rem 0.45rem',
+                  borderRadius: 'var(--radius-sm, 4px)',
+                  background: 'var(--accent-pale, #F9ECE8)',
+                }}>
+                  {t('sahara.privateCaseAccess')}
+                </span>
+                <span>{t('sahara.privateCaseAccessDesc')}</span>
+              </div>
+            </div>
+
+            {/* Discreet Staff Entry Link */}
+            <div style={{ marginTop: '0.25rem' }}>
+              <button
+                id="link-staff-signin"
+                onClick={onOpenStaffLogin}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: '0.25rem 0',
+                  color: 'var(--ink-muted)',
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  textDecoration: 'underline',
+                  textUnderlineOffset: '3px',
+                }}
+              >
+                <IconLock size={13} color="var(--ink-muted)" />
+                <span>{t('sahara.staffSignIn')}</span>
+                <span style={{ fontSize: '0.74rem', color: 'var(--ink-faint, #999)', textDecoration: 'none' }}>
+                  ({locale === 'hi' ? 'परामर्शदाता एवं प्रशासक' : 'Counsellors, Welfare Officers, Administrators'})
+                </span>
+              </button>
+            </div>
           </div>
 
           {/* Quick Pillar assurances */}

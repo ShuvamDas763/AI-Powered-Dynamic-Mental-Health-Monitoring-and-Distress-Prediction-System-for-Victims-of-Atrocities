@@ -33,16 +33,27 @@ function publicUser(user) {
 }
 
 authRouter.post('/login', (req, res) => {
-  const { username, passcode } = req.body ?? {};
+  const { username, passcode, accessCode } = req.body ?? {};
 
-  const account = DEMO_ACCOUNTS.find(
-    (candidate) => candidate.username === username && candidate.passcode === passcode,
-  );
-
-  if (!account) {
-    // Same message for unknown user and wrong passcode, so the response does
-    // not confirm which usernames exist.
-    return res.status(401).json({ error: 'Those sign-in details were not recognised.' });
+  let account;
+  if (accessCode !== undefined && accessCode !== null) {
+    const cleanCode = String(accessCode).trim();
+    account = DEMO_ACCOUNTS.find(
+      (candidate) => candidate.accessCode === cleanCode && candidate.role === 'victim',
+    );
+    if (!account) {
+      // Reassuring privacy-preserving error that never confirms or denies case existence
+      return res.status(401).json({ error: "We couldn't verify this access code." });
+    }
+  } else {
+    account = DEMO_ACCOUNTS.find(
+      (candidate) => candidate.username === username && candidate.passcode === passcode,
+    );
+    if (!account) {
+      // Same message for unknown user and wrong passcode, so the response does
+      // not confirm which usernames exist.
+      return res.status(401).json({ error: 'Those sign-in details were not recognised.' });
+    }
   }
 
   // Regenerate the session on privilege change to avoid session fixation.

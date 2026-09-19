@@ -16,6 +16,7 @@ import session from 'express-session';
 import { authRouter } from '../routes/auth.js';
 import { consentRouter } from '../routes/consent.js';
 import { outreachRouter } from '../routes/outreach.js';
+import { checkinRouter } from '../routes/checkin.js';
 import { store } from '../store/memoryStore.js';
 
 let server;
@@ -38,6 +39,7 @@ function createApp() {
   app.use('/api/auth', authRouter);
   app.use('/api/consent', consentRouter);
   app.use('/api/outreach', outreachRouter);
+  app.use('/api/checkin', checkinRouter);
   return app;
 }
 
@@ -261,6 +263,69 @@ describe('Authorization Hardening (P0-2 & P0-3)', () => {
         nextCheckInDate: '2026-10-20',
       });
       assert.equal(schedRes.status, 200);
+    });
+  });
+
+  describe('P0-4: Direct Case ID Tampering Regression & Access Code Verification', () => {
+    test('1. Authenticated victim cannot submit check-in tampering with another caseId in body (403 expected)', async () => {
+      // victimCookie is authenticated as Complainant A (SIH-CASE-0001).
+      // Attempting to post check-in directly for Victim B (SIH-CASE-0002):
+      const res = await authedPost('/api/checkin', victimCookie, {
+        caseId: 'SIH-CASE-0002',
+        turns: [{ speaker: 'person', text: 'Malicious spoofed check-in attempt' }],
+      });
+      assert.equal(res.status, 403);
+      const body = await res.json();
+      assert.match(body.error, /own case/i);
+    });
+
+    test('2. Invalid 6-digit access code fails authentication without leaking case existence (401 expected)', async () => {
+      const res = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessCode: '999999' }),
+      });
+      assert.equal(res.status, 401);
+      const body = await res.json();
+      assert.equal(body.error, "We couldn't verify this access code.");
+    });
+
+    test('3. Valid 6-digit demo access code resolves and establishes session bound only to own case', async () => {
+      const res = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessCode: '741001' }),
+      });
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(body.user.role, 'victim');
+      assert.equal(body.user.caseId, 'SIH-CASE-0001');
+      assert.equal(body.user.displayName, 'Complainant A (Hindi)');
+    });
+
+    test('4. Authenticated victim cannot query prompts for another case (403 expected)', async () => {
+      const res = await authedGet('/api/checkin/prompts/SIH-CASE-0002', victimCookie);
+      assert.equal(res.status, 403);
+      const body = await res.json();
+      assert.match(body.error, /own case/i);
+    });
+
+    test('5. Case-implicit prompts endpoint resolves from session without exposing case in URL', async () => {
+      const res = await authedGet('/api/checkin/prompts', victimCookie);
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(body.caseId, 'SIH-CASE-0001');
+      assert.ok(Array.isArray(body.prompts));
+    });
+
+    test('6. Authenticated victim B cannot submit check-in with Victim A caseId in request body (403 expected)', async () => {
+      const res = await authedPost('/api/checkin', victimBCookie, {
+        caseId: 'SIH-CASE-0001',
+        turns: [{ speaker: 'person', text: 'Victim B spoofing Victim A check-in' }],
+      });
+      assert.equal(res.status, 403);
+      const body = await res.json();
+      assert.match(body.error, /own case/i);
     });
   });
 });

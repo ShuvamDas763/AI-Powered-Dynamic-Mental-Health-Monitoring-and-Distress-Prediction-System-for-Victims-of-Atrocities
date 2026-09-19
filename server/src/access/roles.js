@@ -114,12 +114,18 @@ export function isKnownRole(role) {
  * otherwise invariant #4 above is a claim rather than a guarantee. So we keep a
  * real (if trivial) login step that the server, not the browser, decides.
  *
+ * DEMO CREDENTIAL NOTICE:
+ * The 6-digit access code is a DEMO CASE-BOUND CREDENTIAL for prototyping and
+ * evaluation. Production roadmap targets OTP / secure link / approved statutory
+ * identity verification.
+ *
  * These are obviously-fake local demo credentials, not secrets.
  */
 export const DEMO_ACCOUNTS = Object.freeze([
   Object.freeze({
     username: 'victim',
     passcode: 'demo',
+    accessCode: '741001',
     role: ROLES.VICTIM,
     displayName: 'Complainant A (Hindi)',
     scope: null,
@@ -128,6 +134,7 @@ export const DEMO_ACCOUNTS = Object.freeze([
   Object.freeze({
     username: 'case-b',
     passcode: 'demo',
+    accessCode: '741002',
     role: ROLES.VICTIM,
     displayName: 'Complainant B (English)',
     scope: null,
@@ -136,6 +143,7 @@ export const DEMO_ACCOUNTS = Object.freeze([
   Object.freeze({
     username: 'case-c',
     passcode: 'demo',
+    accessCode: '741003',
     role: ROLES.VICTIM,
     displayName: 'Complainant C (English)',
     scope: null,
@@ -144,6 +152,7 @@ export const DEMO_ACCOUNTS = Object.freeze([
   Object.freeze({
     username: 'case-d',
     passcode: 'demo',
+    accessCode: '741004',
     role: ROLES.VICTIM,
     displayName: 'Complainant D (English)',
     scope: null,
@@ -152,6 +161,7 @@ export const DEMO_ACCOUNTS = Object.freeze([
   Object.freeze({
     username: 'case-e',
     passcode: 'demo',
+    accessCode: '741005',
     role: ROLES.VICTIM,
     displayName: 'Complainant E (English)',
     scope: null,
@@ -160,6 +170,7 @@ export const DEMO_ACCOUNTS = Object.freeze([
   Object.freeze({
     username: 'case-f',
     passcode: 'demo',
+    accessCode: '741006',
     role: ROLES.VICTIM,
     displayName: 'Complainant F (English)',
     scope: null,
@@ -168,6 +179,7 @@ export const DEMO_ACCOUNTS = Object.freeze([
   Object.freeze({
     username: 'case-g',
     passcode: 'demo',
+    accessCode: '741007',
     role: ROLES.VICTIM,
     displayName: 'Complainant G (English)',
     scope: null,
@@ -176,6 +188,7 @@ export const DEMO_ACCOUNTS = Object.freeze([
   Object.freeze({
     username: 'case-h',
     passcode: 'demo',
+    accessCode: '741008',
     role: ROLES.VICTIM,
     displayName: 'Complainant H (English)',
     scope: null,

@@ -1,22 +1,23 @@
 /**
- * CaseDetail — Flagship Internal Human Casework Cockpit.
+ * CaseDetail — Flagship Operational Human Casework Cockpit.
  *
  * Implements Sections 36–42 & Creative Quality Gate:
- * Within 5 seconds, an authorized counsellor understands:
+ * Within approximately 5 seconds, an authorized counsellor understands:
  *   1. WHO?
  *   2. WHY?
  *   3. WHAT CHANGED?
  *   4. WHAT SHOULD I DO?
  *   5. WHEN?
  *
- * Structured Layout:
- * - Top: Case Identity & 5-Second Clarity Triage Ribbon
- * - 3-Column Core:
- *     LEFT: Statutory Case Journey Stepper & Emotion Profile
- *     CENTER: Longitudinal Well-being Trajectory (Human Journey Chart) & History
- *     RIGHT: "Why This Case Is Here" Expandable Explainable Signals
- * - Below: Care Horizon Engine & Support Handoff Thread
- * - Below: Closed-Loop Intervention Workflow (Actual Backend State Machine)
+ * Design Integrity:
+ * - Unified 5-Second Clarity Command Header (all 5 core decision factors in one balanced row)
+ * - Flagship 3-Column Core:
+ *     LEFT: Statutory Case Journey Stepper (FIR to Closure) & Emotion Signals (only when present)
+ *     CENTER: Longitudinal Well-being Trajectory (Human Journey) & Check-in History
+ *     RIGHT: Explainable Signal Convergence (Transparent why & person's own words)
+ * - Forward Care Horizon & Human Handoff Thread
+ * - Closed-Loop Intervention Workflow (Authoritative Server State Machine)
+ * - Zero AI jargon: uses human, professional terms (Recent signals, Pattern changed, Support recommendation)
  */
 
 import { useEffect, useState, useCallback } from 'react';
@@ -44,12 +45,14 @@ const STAGE_LABELS = {
   trial_pending: 'Proceedings (pending)',
   chargesheet_filed: 'Chargesheet filed',
   post_compensation: 'Post-compensation',
+  rehabilitation: 'Rehabilitation',
+  closure: 'Closed',
 };
 const BAND_COLORS = { low: '#2D5A46', moderate: '#855208', elevated: '#A34226', high: '#9A1F1F' };
 
 const TRIGGER_LABELS = {
   intimidation_on_witness_case: 'Reported intimidation signal on active witness docket',
-  sustained_surface_mismatch: 'Surface reassuring words but declining participation (deflection)',
+  sustained_surface_mismatch: 'Surface reassuring words with declining engagement (deflection signal)',
   threshold_crossed: 'Crossed support-review threshold',
   immediate_review_requested: 'Complainant directly requested counsellor contact',
   rapid_escalation: 'Rapid velocity escalation in distress signals',
@@ -239,7 +242,7 @@ export default function CaseDetail({ caseId, onBack }) {
   const activeOperationalAlerts = operationalAlerts.filter((a) => a.status === 'active');
 
   // Chart data with comparability flags
-  const chartData = trendData.map((p, i) => {
+  const chartData = (trendData || []).map((p, i) => {
     const prev = i > 0 ? trendData[i - 1] : null;
     const comparable = !prev || (p.channel === prev.channel && p.locale === prev.locale);
     return {
@@ -249,14 +252,16 @@ export default function CaseDetail({ caseId, onBack }) {
     };
   });
 
-  const nonComparableCount = chartData.filter((p) => !p.comparable).length;
-  const completedCount = checkIns.filter((c) => c.status === 'completed').length;
-  const missedCount = checkIns.filter((c) => c.status === 'missed').length;
+  const completedCount = (checkIns || []).filter((c) => c.status === 'completed').length;
+  const missedCount = (checkIns || []).filter((c) => c.status === 'missed').length;
+
+  // Meaningful emotions check: only true if there are detected emotions with positive intensity
+  const hasEmotions = Array.isArray(emotions?.emotions) && emotions.emotions.some((e) => e.intensity > 0.05);
 
   return (
     <div>
-      {/* Top Nav: Back to Queue & Copy Actions */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+      {/* Top Navigation: Back Link & Quick Actions */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
         <button className="back-link animate-in" onClick={onBack} style={{ margin: 0 }}>
           <IconArrowLeft size={16} /> Back to Casework Queue
         </button>
@@ -269,55 +274,150 @@ export default function CaseDetail({ caseId, onBack }) {
         </button>
       </div>
 
-      {/* Case Identity Hero Header */}
-      <div className="card card-elevated animate-in animate-in-delay-1" style={{
-        position: 'relative',
-        overflow: 'hidden',
-        borderLeft: `5px solid ${escalation.triggered ? 'var(--risk-high)' : 'var(--accent)'}`,
-        background: 'var(--surface)',
-        marginBottom: '1.25rem',
-        padding: '1.5rem',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+      {/* ═══ 5-SECOND CLARITY COMMAND HEADER (UNIFIED FLAGSHIP COCKPIT) ═══ */}
+      <div
+        className="card card-elevated animate-in"
+        style={{
+          position: 'relative',
+          overflow: 'hidden',
+          borderLeft: `5px solid ${escalation.triggered ? 'var(--risk-high)' : 'var(--accent)'}`,
+          background: '#FFFFFF',
+          marginBottom: '1.5rem',
+          padding: '1.5rem 1.75rem',
+        }}
+      >
+        {/* Row 1: Identity, Priority Badge & Score */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
           <div>
-            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.2rem' }}>
-              SC/ST Protection Casework Docket
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.25rem' }}>
+              SC/ST Protection Casework Docket · Active Welfare File
             </div>
-            <h1 style={{ fontSize: 'clamp(1.5rem, 2.5vw, 2.1rem)', margin: '0 0 0.35rem', fontFamily: 'var(--font-display)' }}>
+            <h1 style={{ fontSize: 'clamp(1.6rem, 2.8vw, 2.2rem)', margin: '0 0 0.35rem', fontFamily: 'var(--font-display)', color: 'var(--ink)' }}>
               {caseRecord.pseudonym}
             </h1>
             <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--ink-muted)' }}>
-              {caseRecord.caseId} · {caseRecord.district}, {caseRecord.state} · Stage: <strong>{STAGE_LABELS[caseRecord.caseStage] ?? caseRecord.caseStage}</strong> ({caseRecord.monthsSinceRegistration} months active)
+              {caseRecord.caseId} · {caseRecord.district}, {caseRecord.state} · Stage: <strong>{STAGE_LABELS[caseRecord.caseStage] ?? caseRecord.caseStage}</strong> ({caseRecord.monthsSinceRegistration} months in care)
             </p>
           </div>
 
-          <div style={{ textAlign: 'right' }}>
+          <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
             <span className={`band-badge ${BAND_CLASS[latestAssessment?.band] ?? ''}`} style={{ fontSize: '0.8rem', padding: '0.25rem 0.75rem' }}>
               {latestAssessment?.band} Support Priority
             </span>
             <div style={{ fontSize: '2.2rem', fontWeight: 700, marginTop: '0.15rem', lineHeight: 1, fontFamily: 'var(--font-display)', color: 'var(--ink)' }}>
               {latestAssessment?.score ?? '—'}
             </div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <div style={{ fontSize: '0.68rem', color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Support Priority Index
             </div>
           </div>
         </div>
 
         {caseRecord.contextNote && (
-          <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: 'var(--surface-sunken)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--line-faint)' }}>
+          <div style={{ marginBottom: '1.25rem', padding: '0.75rem 1rem', background: 'var(--surface-sunken)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--line-faint)' }}>
             <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Docket Note: </span>
             <span style={{ fontSize: '0.85rem', color: 'var(--ink-soft)', fontStyle: 'italic' }}>"{caseRecord.contextNote}"</span>
           </div>
         )}
+
+        {/* Row 2: 5-Second Operational Clarity Ribbon (5 Questions Balanced in 1 Row) */}
+        <div style={{ borderTop: '1px solid var(--line-faint)', paddingTop: '1.15rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+            <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Counsellor Decision Triage · 5-Second Clarity Anchor
+            </div>
+            <span style={{
+              fontSize: '0.7rem',
+              fontWeight: 700,
+              padding: '0.15rem 0.55rem',
+              borderRadius: 'var(--radius-full)',
+              background: escalation.triggered ? 'var(--risk-high-bg)' : 'var(--risk-low-bg)',
+              color: escalation.triggered ? 'var(--risk-high)' : 'var(--risk-low)',
+              textTransform: 'uppercase',
+            }}>
+              {escalation.triggered ? 'Action Required' : 'Monitoring Active'}
+            </span>
+          </div>
+
+          <div className="five-factors-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
+            {/* 1. WHO? */}
+            <div style={{ background: 'var(--surface-sunken)', padding: '0.8rem 0.95rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--line-faint)' }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem' }}>
+                1. WHO?
+              </div>
+              <strong style={{ fontSize: '0.9rem', color: 'var(--ink)' }}>{caseRecord.pseudonym}</strong>
+              <div style={{ fontSize: '0.75rem', color: 'var(--ink-muted)', marginTop: '0.15rem' }}>
+                {caseRecord.district}
+              </div>
+            </div>
+
+            {/* 2. WHY FLAGGED? */}
+            <div style={{ background: 'var(--surface-sunken)', padding: '0.8rem 0.95rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--line-faint)' }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: escalation.triggered ? 'var(--risk-high)' : 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem' }}>
+                2. WHY FLAGGED?
+              </div>
+              <strong style={{ fontSize: '0.82rem', color: escalation.triggered ? 'var(--risk-high)' : 'var(--ink)', lineHeight: 1.35, display: 'block' }}>
+                {escalation.triggered && escalation.triggerReasons?.length > 0
+                  ? escalation.triggerReasons.map((r) => formatTriggerReason(r)).join('; ')
+                  : explanation.headline || 'Routine support check-in.'}
+              </strong>
+            </div>
+
+            {/* 3. WHAT CHANGED? */}
+            <div style={{ background: 'var(--surface-sunken)', padding: '0.8rem 0.95rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--line-faint)' }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem' }}>
+                3. WHAT CHANGED?
+              </div>
+              <div style={{ fontSize: '0.82rem', color: 'var(--ink-soft)' }}>
+                Trend: <strong style={{ color: trend.direction === 'rising' ? 'var(--risk-high)' : trend.direction === 'improving' ? 'var(--risk-low)' : 'var(--ink)' }}>
+                  {trend.direction === 'rising' ? 'Concern rising' : trend.direction === 'improving' ? 'Improving' : 'Holding stable'}
+                </strong>
+                <div style={{ fontSize: '0.74rem', color: 'var(--ink-muted)', marginTop: '0.15rem' }}>
+                  ({Math.abs(Math.round(trend.delta ?? 0))} pts shift over {trend.points ?? chartData.length} entries)
+                </div>
+              </div>
+            </div>
+
+            {/* 4. WHAT TO DO? */}
+            <div style={{ background: 'var(--surface-sunken)', padding: '0.8rem 0.95rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--line-faint)' }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem' }}>
+                4. WHAT SHOULD I DO?
+              </div>
+              {(() => {
+                const displayList = interventionsList.length > 0 ? interventionsList : interventions;
+                const pending = displayList?.find((i) => i.status === 'RECOMMENDED' || i.status === 'ACCEPTED') || displayList?.[0];
+                if (!pending) return <div style={{ fontSize: '0.8rem', color: 'var(--ink-muted)' }}>Continue regular monitoring cadence.</div>;
+                return (
+                  <strong style={{ fontSize: '0.82rem', color: 'var(--ink)', lineHeight: 1.35, display: 'block' }}>
+                    {pending.label}
+                  </strong>
+                );
+              })()}
+            </div>
+
+            {/* 5. WHEN TO FOLLOW UP? */}
+            <div style={{ background: 'var(--surface-sunken)', padding: '0.8rem 0.95rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--line-faint)' }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: prediction.courtDateRisk ? 'var(--risk-high)' : 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem' }}>
+                5. WHEN TO FOLLOW UP?
+              </div>
+              <strong style={{ fontSize: '0.82rem', color: prediction.courtDateRisk ? 'var(--risk-high)' : 'var(--ink)', lineHeight: 1.35, display: 'block' }}>
+                {prediction.courtDateRisk
+                  ? '⚠️ Prior to Upcoming Court Date'
+                  : escalation.triggered
+                    ? 'Within 24–48 Hours'
+                    : 'Next Scheduled Review'}
+              </strong>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Active Operational Review Alerts Banner (if any) */}
       {activeOperationalAlerts.length > 0 && (
         <div className="card animate-in" style={{
-          marginBottom: '1.25rem',
+          marginBottom: '1.5rem',
           borderLeft: '4px solid var(--accent)',
-          background: 'var(--surface)',
+          background: '#FFFFFF',
         }}>
           <h3 style={{ fontSize: '0.96rem', margin: '0 0 0.65rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--ink)' }}>
             <span>🔔</span> Active Operational Alerts ({activeOperationalAlerts.length})
@@ -353,117 +453,28 @@ export default function CaseDetail({ caseId, onBack }) {
         </div>
       )}
 
-      {/* ═══ 5-SECOND CLARITY TRIAGE RIBBON (WHO, WHY, WHAT CHANGED, WHAT TO DO, WHEN) ═══ */}
-      <div className="card card-elevated animate-in animate-in-delay-1" style={{ marginBottom: '1.5rem', padding: '1.4rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--line-faint)', paddingBottom: '0.65rem' }}>
-          <div>
-            <strong style={{ fontSize: '0.98rem', color: 'var(--ink)' }}>Counsellor Triage: 5 Core Decision Factors</strong>
-            <div style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>Essential human-in-the-loop answers for immediate decision-support</div>
-          </div>
-          <span style={{
-            fontSize: '0.72rem',
-            fontWeight: 700,
-            padding: '0.2rem 0.65rem',
-            borderRadius: 'var(--radius-full)',
-            background: escalation.triggered ? 'var(--risk-high-bg)' : 'var(--risk-low-bg)',
-            color: escalation.triggered ? 'var(--risk-high)' : 'var(--risk-low)',
-            textTransform: 'uppercase',
-          }}>
-            {escalation.triggered ? 'Action Required' : 'Monitoring Active'}
-          </span>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-          {/* 1. WHO? */}
-          <div style={{ background: 'var(--surface-sunken)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-sm)' }}>
-            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>
-              1. WHO?
-            </div>
-            <strong style={{ fontSize: '0.92rem', color: 'var(--ink)' }}>{caseRecord.pseudonym}</strong>
-            <div style={{ fontSize: '0.76rem', color: 'var(--ink-muted)', marginTop: '0.2rem' }}>
-              {caseRecord.district}, {caseRecord.state}
-            </div>
-          </div>
-
-          {/* 2. WHY FLAGGED? */}
-          <div style={{ background: 'var(--surface-sunken)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-sm)' }}>
-            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: escalation.triggered ? 'var(--risk-high)' : 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>
-              2. WHY FLAGGED?
-            </div>
-            <strong style={{ fontSize: '0.85rem', color: escalation.triggered ? 'var(--risk-high)' : 'var(--ink)' }}>
-              {escalation.triggered && escalation.triggerReasons?.length > 0
-                ? escalation.triggerReasons.map((r) => formatTriggerReason(r)).join('; ')
-                : explanation.headline || 'Routine support check-in.'}
-            </strong>
-          </div>
-
-          {/* 3. WHAT CHANGED? */}
-          <div style={{ background: 'var(--surface-sunken)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-sm)' }}>
-            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>
-              3. WHAT CHANGED?
-            </div>
-            <div style={{ fontSize: '0.82rem', color: 'var(--ink-soft)' }}>
-              Trend: <strong style={{ color: trend.direction === 'rising' ? 'var(--risk-high)' : trend.direction === 'improving' ? 'var(--risk-low)' : 'var(--ink)' }}>
-                {trend.direction === 'rising' ? 'Concern rising' : trend.direction === 'improving' ? 'Improving' : 'Holding stable'}
-              </strong> ({Math.abs(Math.round(trend.delta ?? 0))} pts shift).
-            </div>
-          </div>
-
-          {/* 4. WHAT SHOULD I DO? */}
-          <div style={{ background: 'var(--surface-sunken)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-sm)' }}>
-            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>
-              4. WHAT TO DO?
-            </div>
-            {(() => {
-              const displayList = interventionsList.length > 0 ? interventionsList : interventions;
-              const pending = displayList?.find((i) => i.status === 'RECOMMENDED' || i.status === 'ACCEPTED') || displayList?.[0];
-              if (!pending) return <div style={{ fontSize: '0.8rem', color: 'var(--ink-muted)' }}>Continue regular monitoring cadence.</div>;
-              return (
-                <div style={{ fontSize: '0.82rem', color: 'var(--ink)' }}>
-                  <strong>{pending.label}</strong>
-                </div>
-              );
-            })()}
-          </div>
-
-          {/* 5. WHEN TO FOLLOW UP? */}
-          <div style={{ background: 'var(--surface-sunken)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-sm)' }}>
-            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: prediction.courtDateRisk ? 'var(--risk-high)' : 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>
-              5. WHEN TO FOLLOW UP?
-            </div>
-            <strong style={{ fontSize: '0.84rem', color: prediction.courtDateRisk ? 'var(--risk-high)' : 'var(--ink)' }}>
-              {prediction.courtDateRisk
-                ? '⚠️ Prior to Upcoming Court Date'
-                : escalation.triggered
-                  ? 'Within 24–48 Hours'
-                  : 'Next Scheduled Review (Weekly)'}
-            </strong>
-          </div>
-        </div>
-      </div>
-
       {/* ═══ FLAGSHIP 3-COLUMN COCKPIT (JOURNEY / TRAJECTORY / SIGNALS) ═══ */}
-      <div className="case-flagship-grid animate-in animate-in-delay-2" style={{ marginBottom: '1.5rem' }}>
-        {/* ── LEFT COLUMN: STATUTORY CASE JOURNEY & EMOTION PROFILE ── */}
+      <div className="case-flagship-grid animate-in animate-in-delay-1" style={{ marginBottom: '1.5rem' }}>
+        {/* ── LEFT COLUMN: STATUTORY CASE JOURNEY ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           {/* Statutory Case Journey */}
-          <div className="card" style={{ padding: '1.25rem' }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.65rem' }}>
+          <div className="card" style={{ padding: '1.4rem', background: '#FFFFFF' }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.85rem' }}>
               Statutory Case Journey
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               {LIFECYCLE_STAGES.map((stg, i) => {
                 const currentIdx = getStageIndex(caseRecord.caseStage);
                 const isPast = i < currentIdx;
                 const isCurrent = i === currentIdx;
 
                 return (
-                  <div key={stg.id} style={{ display: 'flex', gap: '0.65rem', alignItems: 'flex-start' }}>
+                  <div key={stg.id} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
                     <div style={{
                       width: 26,
                       height: 26,
                       borderRadius: '50%',
-                      background: isPast ? 'var(--risk-low)' : isCurrent ? 'var(--accent)' : 'var(--surface-sunken)',
+                      background: isPast ? 'var(--risk-low, #2D5A46)' : isCurrent ? 'var(--accent, #8B321D)' : 'var(--surface-sunken)',
                       color: isPast || isCurrent ? '#FFFFFF' : 'var(--ink-muted)',
                       display: 'flex',
                       alignItems: 'center',
@@ -480,7 +491,7 @@ export default function CaseDetail({ caseId, onBack }) {
                       <div style={{ fontSize: '0.85rem', fontWeight: isCurrent ? 700 : 600, color: isCurrent ? 'var(--accent)' : 'var(--ink)' }}>
                         {stg.label} {isCurrent && '← active'}
                       </div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--ink-muted)', lineHeight: 1.3 }}>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--ink-muted)', lineHeight: 1.35 }}>
                         {stg.desc}
                       </div>
                     </div>
@@ -490,52 +501,22 @@ export default function CaseDetail({ caseId, onBack }) {
             </div>
           </div>
 
-          {/* Emotion Profile Radar & Pills */}
-          {emotions.emotions && (
-            <div className="card" style={{ padding: '1.25rem' }}>
+          {/* Emotion Signals: ONLY render when real non-zero emotion signals exist */}
+          {hasEmotions && (
+            <div className="card" style={{ padding: '1.25rem', background: '#FFFFFF' }}>
               <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.65rem' }}>
-                Expressed Emotion Profile
+                Expressed Emotion Signals
               </div>
-
-              {(() => {
-                const ALL_EMOTIONS = [
-                  { code: 'fear', label: 'Fear' },
-                  { code: 'anger', label: 'Anger' },
-                  { code: 'sadness', label: 'Sadness' },
-                  { code: 'hopelessness', label: 'Hopeless' },
-                  { code: 'fatigue', label: 'Fatigue' },
-                  { code: 'withdrawal', label: 'Isolation' },
-                ];
-                const detected = emotions.emotions || [];
-                const radarData = ALL_EMOTIONS.map((e) => {
-                  const match = detected.find((d) => d.code === e.code);
-                  return { emotion: e.label, value: match ? Math.round(match.intensity * 100) : 0 };
-                });
-
-                return (
-                  <div style={{ width: '100%', height: 190 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="65%">
-                        <PolarGrid stroke="var(--line-faint)" />
-                        <PolarAngleAxis dataKey="emotion" tick={{ fontSize: 10, fill: 'var(--ink-muted)' }} />
-                        <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                        <Radar dataKey="value" stroke="var(--accent)" fill="var(--accent)" fillOpacity={0.25} strokeWidth={2} />
-                      </RadarChart>
-                    </ResponsiveContainer>
-                  </div>
-                );
-              })()}
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
-                {(emotions.emotions || []).map((emo) => (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                {emotions.emotions.filter((e) => e.intensity > 0.05).map((emo) => (
                   <div key={emo.code} style={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '0.35rem 0.55rem',
+                    padding: '0.4rem 0.65rem',
                     background: 'var(--surface-sunken)',
                     borderRadius: 'var(--radius-xs)',
-                    fontSize: '0.76rem',
+                    fontSize: '0.78rem',
                   }}>
                     <span>{emo.label}</span>
                     <strong style={{ color: 'var(--accent)' }}>{Math.round(emo.intensity * 100)}%</strong>
@@ -546,9 +527,9 @@ export default function CaseDetail({ caseId, onBack }) {
           )}
         </div>
 
-        {/* ── CENTER COLUMN: LONGITUDINAL WELL-BEING TRAJECTORY (HUMAN JOURNEY) ── */}
+        {/* ── CENTER COLUMN: LONGITUDINAL WELL-BEING TRAJECTORY & HISTORY ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div className="card" style={{ padding: '1.4rem' }}>
+          <div className="card" style={{ padding: '1.4rem', background: '#FFFFFF' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
               <div>
                 <strong style={{ fontSize: '0.98rem', color: 'var(--ink)' }}>Well-being Trajectory</strong>
@@ -582,59 +563,55 @@ export default function CaseDetail({ caseId, onBack }) {
                       dataKey="score"
                       stroke="var(--accent)"
                       strokeWidth={2.5}
+                      fillOpacity={1}
                       fill="url(#distressGradient)"
                       dot={<ComparabilityDot />}
                     />
                   </AreaChart>
                 </ResponsiveContainer>
-
-                {nonComparableCount > 0 && (
-                  <div style={{
-                    marginTop: '0.65rem',
-                    padding: '0.45rem 0.65rem',
-                    background: 'var(--surface-sunken)',
-                    borderRadius: 'var(--radius-sm)',
-                    fontSize: '0.75rem',
-                    color: 'var(--ink-muted)',
-                  }}>
-                    <strong style={{ color: 'var(--tertiary)' }}>≠ Notice:</strong> {nonComparableCount} check-in(s) used a different channel/locale. Shifts may reflect measurement context rather than change in state.
-                  </div>
-                )}
               </>
             ) : (
-              <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--ink-muted)', fontSize: '0.88rem' }}>
-                First baseline check-in recorded. Additional check-ins will establish the trajectory line.
+              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--ink-muted)', fontSize: '0.85rem' }}>
+                Baseline established. Subsequent check-ins will render the longitudinal trajectory.
               </div>
             )}
           </div>
 
-          {/* Check-in History Accordion */}
-          <div className="card" style={{ padding: '1.25rem' }}>
+          {/* Check-in History */}
+          <div className="card" style={{ padding: '1.4rem', background: '#FFFFFF' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
-              <strong style={{ fontSize: '0.9rem', color: 'var(--ink)' }}>Check-in History ({checkIns.length})</strong>
-              <div style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>
-                <span>✓ {completedCount} completed</span>
-                {missedCount > 0 && <span style={{ marginLeft: '0.5rem', color: 'var(--risk-moderate)' }}>✗ {missedCount} missed</span>}
+              <strong style={{ fontSize: '0.94rem', color: 'var(--ink)' }}>
+                Check-in History ({checkIns.length})
+              </strong>
+              <div style={{ fontSize: '0.74rem', color: 'var(--ink-muted)' }}>
+                ✓ {completedCount} completed {missedCount > 0 && `✗ ${missedCount} missed`}
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', maxHeight: 320, overflowY: 'auto' }}>
-              {checkIns.map((c) => (
-                <div key={c.id} style={{
-                  padding: '0.75rem 0.85rem',
-                  borderRadius: 'var(--radius-sm)',
-                  background: 'var(--surface-sunken)',
-                  border: '1px solid var(--line-faint)',
-                  borderLeft: c.assessment?.escalation?.triggered ? '3px solid var(--risk-high)' : 'none',
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem' }}>
-                    <strong>Check-in #{c.sequence || '1'} ({c.channel})</strong>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>{new Date(c.occurredAt).toLocaleDateString()}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: 320, overflowY: 'auto' }}>
+              {checkIns.map((ci) => (
+                <div
+                  key={ci.id}
+                  style={{
+                    padding: '0.85rem 1rem',
+                    background: 'var(--surface-sunken)',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--line-faint)',
+                    borderLeft: ci.status === 'missed' ? '3px solid var(--risk-moderate)' : '3px solid var(--accent)',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem', color: 'var(--ink-muted)', marginBottom: '0.35rem' }}>
+                    <strong>Check-in #{ci.checkInNumber} ({ci.channel})</strong>
+                    <span>{ci.scheduledDate || 'Recent'}</span>
                   </div>
-                  {c.turns && c.turns.length > 0 && (
-                    <div style={{ fontSize: '0.78rem', color: 'var(--ink-soft)', marginTop: '0.35rem', fontStyle: 'italic' }}>
-                      "{c.turns.find((t) => t.speaker === 'person')?.text || 'Check-in completed'}"
-                    </div>
+                  {ci.content ? (
+                    <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--ink-soft)', fontStyle: 'italic', lineHeight: 1.45 }}>
+                      "{ci.content}"
+                    </p>
+                  ) : (
+                    <span style={{ fontSize: '0.8rem', color: 'var(--ink-muted)', fontStyle: 'italic' }}>
+                      {ci.status === 'missed' ? 'Scheduled check-in missed by complainant.' : 'No notes recorded.'}
+                    </span>
                   )}
                 </div>
               ))}
@@ -642,80 +619,76 @@ export default function CaseDetail({ caseId, onBack }) {
           </div>
         </div>
 
-        {/* ── RIGHT COLUMN: "WHY THIS CASE IS HERE" EXPLAINABLE SIGNALS ── */}
+        {/* ── RIGHT COLUMN: EXPLAINABLE SIGNAL CONVERGENCE ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div className="card" style={{ padding: '1.35rem' }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.45rem' }}>
+          <div className="card" style={{ padding: '1.4rem', background: '#FFFFFF' }}>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--tertiary, #A34226)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.35rem' }}>
               Explainable Signal Convergence
             </div>
-            <strong style={{ fontSize: '0.98rem', color: 'var(--ink)', display: 'block', marginBottom: '0.85rem' }}>
+            <h3 style={{ fontSize: '1.05rem', margin: '0 0 1rem', color: 'var(--ink)' }}>
               Why this case is here
-            </strong>
+            </h3>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {drivers.length > 0 ? (
-                drivers.map((drv, idx) => {
-                  const isExpanded = expandedSignals[drv.component] ?? (idx === 0);
-
-                  return (
-                    <div key={drv.component} style={{
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              {drivers.map((drv) => {
+                const isExpanded = expandedSignals[drv.code];
+                return (
+                  <div
+                    key={drv.code}
+                    className="driver-card"
+                    style={{
                       background: 'var(--surface-sunken)',
-                      borderRadius: 'var(--radius-sm)',
                       border: '1px solid var(--line-faint)',
-                      overflow: 'hidden',
-                    }}>
-                      <button
-                        onClick={() => toggleSignal(drv.component)}
-                        style={{
-                          width: '100%',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          padding: '0.65rem 0.85rem',
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                          font: 'inherit',
-                        }}
-                      >
-                        <strong style={{ fontSize: '0.84rem', color: 'var(--ink)' }}>{drv.label}</strong>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent)' }}>
-                            {drv.contribution} pts ({drv.sharePct}%)
-                          </span>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--ink-faint)' }}>
-                            {isExpanded ? '▴' : '▾'}
-                          </span>
-                        </div>
-                      </button>
-
-                      {isExpanded && (
-                        <div style={{ padding: '0 0.85rem 0.65rem', fontSize: '0.78rem', color: 'var(--ink-soft)', lineHeight: 1.45 }}>
-                          <p style={{ margin: 0 }}>{drv.detail}</p>
-                        </div>
-                      )}
+                      borderRadius: 'var(--radius-sm)',
+                      padding: '0.75rem 0.95rem',
+                    }}
+                  >
+                    <div
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+                      onClick={() => toggleSignal(drv.code)}
+                    >
+                      <div>
+                        <strong style={{ fontSize: '0.85rem', color: 'var(--ink)' }}>{drv.label}</strong>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent)' }}>
+                          {(typeof drv.contribution === 'number' ? drv.contribution : drv.contribution?.points ?? 0).toFixed(1)} pts ({(typeof drv.sharePct === 'number' ? drv.sharePct : drv.contribution?.sharePercent ?? 0).toFixed(1)}%)
+                        </span>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--ink-muted)' }}>{isExpanded ? '▴' : '▾'}</span>
+                      </div>
                     </div>
-                  );
-                })
-              ) : (
-                <div style={{ fontSize: '0.84rem', color: 'var(--ink-muted)', fontStyle: 'italic' }}>
-                  Signals are currently within anticipated baseline range.
-                </div>
-              )}
+                    {isExpanded && (
+                      <div style={{ marginTop: '0.65rem', paddingTop: '0.55rem', borderTop: '1px dashed var(--line-faint)', fontSize: '0.78rem', color: 'var(--ink-muted)', lineHeight: 1.45 }}>
+                        {drv.detail || drv.rationale || 'Signal calculated from multi-factor longitudinal analysis.'}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
-            {/* Person's Own Words */}
-            {(explanation.signalPhrases || []).length > 0 && (
-              <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px dashed var(--line-faint)' }}>
-                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.4rem' }}>
+            {/* Person's Own Words Quotes */}
+            {explanation.quotes && explanation.quotes.length > 0 && (
+              <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--line-faint)' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.5rem' }}>
                   Person's Own Words
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-                  {explanation.signalPhrases.map((phrase, i) => (
-                    <span key={i} className="phrase-tag">
-                      "{phrase}"
-                    </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  {explanation.quotes.map((q, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        padding: '0.55rem 0.75rem',
+                        background: '#FFFFFF',
+                        borderRadius: 'var(--radius-sm)',
+                        border: '1px solid var(--line-faint)',
+                        fontSize: '0.8rem',
+                        fontStyle: 'italic',
+                        color: 'var(--ink-soft)',
+                      }}
+                    >
+                      "{q}"
+                    </div>
                   ))}
                 </div>
               </div>
@@ -724,96 +697,62 @@ export default function CaseDetail({ caseId, onBack }) {
         </div>
       </div>
 
-      {/* ═══ BELOW 1: CARE HORIZON & SUPPORT HANDOFF THREAD ════════════════ */}
-      <div className="card card-elevated animate-in animate-in-delay-3" style={{ marginBottom: '1.5rem', padding: '1.4rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <div>
-            <strong style={{ fontSize: '0.98rem', color: 'var(--ink)' }}>Care Horizon & Support Handoff</strong>
-            <div style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>
-              Forward-looking alignment connecting noticed signals to verified welfare action
-            </div>
-          </div>
-          {prediction.courtDateRisk && (
-            <span style={{
-              fontSize: '0.74rem',
-              fontWeight: 700,
-              padding: '0.2rem 0.65rem',
-              borderRadius: 'var(--radius-full)',
-              background: 'var(--risk-high-bg)',
-              color: 'var(--risk-high)',
-              border: '1px solid var(--risk-high-border)',
-            }}>
-              ⚠️ Court Hearing Date Alignment
-            </span>
-          )}
+      {/* ═══ CARE HORIZON & SUPPORT HANDOFF ═══ */}
+      <div className="card animate-in" style={{ marginBottom: '1.5rem', padding: '1.5rem', background: '#FFFFFF' }}>
+        <div style={{ marginBottom: '1.25rem' }}>
+          <h3 style={{ fontSize: '1.05rem', margin: '0 0 0.35rem', color: 'var(--ink)' }}>Care Horizon & Support Handoff</h3>
+          <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--ink-muted)' }}>
+            Forward-looking alignment connecting noticed signals to verified welfare action
+          </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
-          <div style={{ background: 'var(--surface-sunken)', padding: '0.85rem', borderRadius: 'var(--radius-sm)' }}>
-            <div style={{ fontSize: '0.7rem', color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Next Support Cadence
-            </div>
-            <strong style={{ fontSize: '0.92rem', color: 'var(--ink)', display: 'block', marginTop: '0.2rem' }}>
-              {prediction.courtDateRisk ? 'Within 24–48 Hours' : 'Weekly Check-in Scheduled'}
-            </strong>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+          <div style={{ padding: '0.95rem 1.15rem', background: 'var(--surface-sunken)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--line-faint)' }}>
+            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Next Support Cadence</div>
+            <strong style={{ fontSize: '0.92rem', color: 'var(--ink)', display: 'block', marginTop: '0.2rem' }}>Weekly Check-in Scheduled</strong>
             <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>Regular contact window</span>
           </div>
 
-          <div style={{ background: 'var(--surface-sunken)', padding: '0.85rem', borderRadius: 'var(--radius-sm)' }}>
-            <div style={{ fontSize: '0.7rem', color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Upcoming Statutory Milestone
-            </div>
-            <strong style={{ fontSize: '0.92rem', color: 'var(--ink)', display: 'block', marginTop: '0.2rem' }}>
-              Special Court Hearing
-            </strong>
+          <div style={{ padding: '0.95rem 1.15rem', background: 'var(--surface-sunken)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--line-faint)' }}>
+            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Upcoming Statutory Milestone</div>
+            <strong style={{ fontSize: '0.92rem', color: 'var(--ink)', display: 'block', marginTop: '0.2rem' }}>Special Court Hearing</strong>
             <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>Witness protection vigilance</span>
           </div>
 
-          <div style={{ background: 'var(--surface-sunken)', padding: '0.85rem', borderRadius: 'var(--radius-sm)' }}>
-            <div style={{ fontSize: '0.7rem', color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Trajectory Projection
-            </div>
-            <strong style={{ fontSize: '0.92rem', color: trend.direction === 'rising' ? 'var(--risk-high)' : 'var(--ink)', display: 'block', marginTop: '0.2rem' }}>
-              {prediction.projectedWindow?.windowText || 'Stable baseline horizon'}
+          <div style={{ padding: '0.95rem 1.15rem', background: 'var(--surface-sunken)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--line-faint)' }}>
+            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Trajectory Projection</div>
+            <strong style={{ fontSize: '0.92rem', color: prediction.trajectoryDirection === 'rising' ? 'var(--risk-high)' : 'var(--risk-low)', display: 'block', marginTop: '0.2rem' }}>
+              {prediction.trajectoryDirection === 'rising' ? 'Rising Trajectory Risk' : 'Stable baseline horizon'}
             </strong>
-            <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>Confidence: {prediction.confidence || 'medium'}</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>Confidence: {prediction.confidence || 'high'}</span>
           </div>
         </div>
 
-        {/* Support Handoff Thread Sequence */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          position: 'relative',
-          padding: '0.85rem 0.5rem 0',
-          borderTop: '1px dashed var(--line-faint)',
-          overflowX: 'auto',
-          gap: '0.75rem',
-        }}>
+        {/* Support Thread Chain */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', overflowX: 'auto', paddingBottom: '0.5rem', gap: '0.5rem' }}>
           {[
-            { step: '1', title: 'Signal Noticed', state: 'completed' },
+            { step: '1', title: 'Signal Noticed', state: 'done' },
             { step: '2', title: 'Counsellor Review', state: 'active' },
             { step: '3', title: 'Support Assigned', state: 'pending' },
             { step: '4', title: 'Contact Verified', state: 'pending' },
             { step: '5', title: 'Outcome Documented', state: 'pending' },
           ].map(({ step, title, state }) => (
-            <div key={title} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+            <div key={step} style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexShrink: 0 }}>
               <div style={{
-                width: 24,
-                height: 24,
+                width: 28,
+                height: 28,
                 borderRadius: '50%',
-                background: state === 'completed' ? 'var(--risk-low)' : state === 'active' ? 'var(--accent)' : 'var(--surface-sunken)',
-                color: state === 'completed' || state === 'active' ? '#FFFFFF' : 'var(--ink-muted)',
-                fontSize: '0.72rem',
-                fontWeight: 700,
+                background: state === 'done' ? 'var(--risk-low)' : state === 'active' ? 'var(--accent)' : 'var(--surface-sunken)',
+                color: state === 'pending' ? 'var(--ink-muted)' : '#FFFFFF',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                fontSize: '0.75rem',
+                fontWeight: 700,
               }}>
-                {state === 'completed' ? '✓' : step}
+                {state === 'done' ? '✓' : step}
               </div>
-              <span style={{ fontSize: '0.78rem', fontWeight: state === 'active' ? 700 : 500, color: state === 'active' ? 'var(--accent)' : 'var(--ink)' }}>
+              <span style={{ fontSize: '0.82rem', fontWeight: state === 'active' ? 700 : 600, color: state === 'active' ? 'var(--accent)' : 'var(--ink)' }}>
                 {title}
               </span>
             </div>
@@ -821,30 +760,30 @@ export default function CaseDetail({ caseId, onBack }) {
         </div>
       </div>
 
-      {/* ═══ BELOW 2: CLOSED-LOOP INTERVENTION WORKFLOW (STATE MACHINE) ═══ */}
+      {/* ═══ CLOSED-LOOP SUPPORT ACTIONS (AUTHORITATIVE STATE MACHINE) ═══ */}
       {(() => {
         const displayList = interventionsList.length > 0 ? interventionsList : interventions;
         if (!displayList || displayList.length === 0) return null;
 
         const STATUS_BADGE_STYLE = {
-          RECOMMENDED: { bg: 'var(--surface-sunken)', color: 'var(--ink-muted)' },
-          ACCEPTED: { bg: 'rgba(49, 130, 206, 0.12)', color: '#3182ce' },
-          ASSIGNED: { bg: 'rgba(128, 90, 213, 0.12)', color: '#805ad5' },
-          CONTACT_ATTEMPTED: { bg: 'rgba(214, 158, 46, 0.12)', color: '#d69e2e' },
-          CONTACTED: { bg: 'rgba(45, 90, 70, 0.12)', color: 'var(--secondary)' },
-          IN_PROGRESS: { bg: 'rgba(192, 80, 54, 0.12)', color: 'var(--accent)' },
+          RECOMMENDED: { bg: 'var(--risk-moderate-bg)', color: 'var(--risk-moderate)' },
+          ACCEPTED: { bg: 'var(--accent-pale)', color: 'var(--accent)' },
+          ASSIGNED: { bg: '#EDE7F6', color: '#5E35B1' },
+          CONTACTED: { bg: '#E0F2F1', color: '#00695C' },
+          FOLLOW_UP_DUE: { bg: 'var(--risk-high-bg)', color: 'var(--risk-high)' },
           COMPLETED: { bg: 'var(--risk-low-bg)', color: 'var(--risk-low)' },
-          CLOSED: { bg: 'var(--surface-deep)', color: 'var(--ink-muted)' },
+          DECLINED: { bg: 'var(--surface-sunken)', color: 'var(--ink-muted)' },
+          CLOSED: { bg: 'var(--surface-sunken)', color: 'var(--ink-muted)' },
         };
 
         return (
-          <div className="card animate-in animate-in-delay-3" style={{ padding: '1.4rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div className="card animate-in" style={{ marginBottom: '2rem', padding: '1.5rem', background: '#FFFFFF' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <div>
-                <strong style={{ fontSize: '0.98rem', color: 'var(--ink)' }}>Closed-Loop Support Actions</strong>
-                <div style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>
+                <h3 style={{ fontSize: '1.05rem', margin: '0 0 0.25rem', color: 'var(--ink)' }}>Closed-Loop Support Actions</h3>
+                <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--ink-muted)' }}>
                   State-backed intervention lifecycle with verifiable outcomes
-                </div>
+                </p>
               </div>
               {actionBusy && (
                 <span style={{ fontSize: '0.75rem', color: 'var(--accent)' }}>Updating intervention state…</span>

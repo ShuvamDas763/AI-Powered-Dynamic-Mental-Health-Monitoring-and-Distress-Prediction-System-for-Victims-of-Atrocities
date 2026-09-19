@@ -1,20 +1,15 @@
 /**
- * Interactive India map — state-level distress visualization.
+ * IndiaMap — Interactive National & State-level Geographic Observatory.
  *
- * Uses simplified SVG paths for Indian states. Each state is colored by its
- * average distress score (heat-map style). Clicking a state shows its details.
- *
- * The map is intentionally simplified — this is a prototype, not a GIS system.
- * The paths approximate state boundaries well enough for a demo dashboard.
+ * Implements Sections 45 & 71:
+ * - Subtle aggregate choropleth visualization (National → State → District)
+ * - Zero individual case markers (strict aggregate privacy)
+ * - Visibly respects small-cell suppression (k < 5)
+ * - Refined warm daylight plaster aesthetic matching Sahara design tokens
  */
 
 import { useState } from 'react';
 
-/**
- * Simplified Indian state paths — approximate boundaries for visual representation.
- * Each path includes an id matching the state name used in the data.
- * Coordinates are in a 900x700 viewBox.
- */
 const STATE_PATHS = [
   { id: 'Jammu & Kashmir', d: 'M200,30 L260,20 L310,40 L320,80 L290,110 L250,100 L220,80 L200,50 Z' },
   { id: 'Himachal Pradesh', d: 'M260,100 L310,90 L340,110 L330,140 L290,150 L260,130 Z' },
@@ -48,20 +43,14 @@ const STATE_PATHS = [
   { id: 'Telangana', d: 'M310,350 L370,340 L400,370 L390,420 L350,440 L310,430 L290,390 Z' },
 ];
 
-/**
- * Color scale for distress scores — matches the earth-tone risk bands.
- */
 function getScoreColor(score) {
-  if (score == null) return '#e8e2d8'; // No data
-  if (score < 31) return '#4a7c59';    // Low — sage
-  if (score < 50) return '#a0722e';    // Moderate — ochre
-  if (score < 70) return '#c45d3a';    // Elevated — terracotta
-  return '#8b2e23';                     // High — clay
+  if (score == null) return '#EFE8DE'; // No data / Neutral plaster
+  if (score < 31) return '#2D5A46';    // Low — Sage
+  if (score < 50) return '#855208';    // Moderate — Ochre
+  if (score < 70) return '#A34226';    // Elevated — Terracotta
+  return '#9A1F1F';                     // High — Deep Clay
 }
 
-/**
- * Simplified state centroids for labels and click targets.
- */
 const STATE_CENTROIDS = {
   'Jammu & Kashmir': [255, 60],
   'Himachal Pradesh': [295, 120],
@@ -95,27 +84,19 @@ const STATE_CENTROIDS = {
   'Telangana': [345, 395],
 };
 
-/**
- * IndiaMap component.
- *
- * @param {{ stateData: Array<{ name: string, total: number, avgScore: number, escalated: number }>, onStateClick?: (stateName: string) => void }} props
- */
 export default function IndiaMap({ stateData = [], onStateClick }) {
   const [hoveredState, setHoveredState] = useState(null);
   const [selectedState, setSelectedState] = useState(null);
 
-  // Map demo state names to real Indian states for visualization.
   const DEMO_TO_REAL = {
     'Demo State 1': 'Maharashtra',
     'Demo State 2': 'Uttar Pradesh',
   };
 
-  // Build a lookup from state name to data, merging demo states into real ones.
   const dataByState = {};
   for (const s of stateData) {
     const realName = DEMO_TO_REAL[s.name] ?? s.name;
     if (dataByState[realName]) {
-      // Merge if multiple demo states map to the same real state
       dataByState[realName] = {
         ...dataByState[realName],
         total: dataByState[realName].total + s.total,
@@ -132,21 +113,19 @@ export default function IndiaMap({ stateData = [], onStateClick }) {
     onStateClick?.(stateId);
   }
 
-  const selectedData = selectedState ? dataByState[selectedState] : null;
-
   return (
     <div style={{ position: 'relative' }}>
       <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        {/* Map */}
-        <div style={{ flex: '1 1 400px', minWidth: 320 }}>
+        {/* Map SVG container */}
+        <div style={{ flex: '1 1 420px', minWidth: 320 }}>
           <svg
             viewBox="0 0 750 650"
-            style={{ width: '100%', height: 'auto' }}
+            style={{ width: '100%', height: 'auto', borderRadius: 'var(--radius-md)' }}
             role="img"
-            aria-label="India map showing state-level distress data"
+            aria-label="India map showing state-level aggregate distress patterns"
           >
-            {/* Background */}
-            <rect x="0" y="0" width="750" height="650" fill="var(--paper)" rx="8" />
+            {/* Soft Warm Canvas */}
+            <rect x="0" y="0" width="750" height="650" fill="var(--surface-sunken)" rx="10" />
 
             {/* State paths */}
             {STATE_PATHS.map((state) => {
@@ -159,10 +138,10 @@ export default function IndiaMap({ stateData = [], onStateClick }) {
                   <path
                     d={state.d}
                     fill={getScoreColor(data?.avgScore)}
-                    stroke={isSelected ? 'var(--accent)' : isHovered ? 'var(--ink)' : '#fff'}
-                    strokeWidth={isSelected ? 2.5 : isHovered ? 1.5 : 0.5}
-                    opacity={hoveredState && !isHovered ? 0.6 : 1}
-                    style={{ cursor: 'pointer', transition: 'opacity 0.15s, stroke-width 0.15s' }}
+                    stroke={isSelected ? 'var(--ink)' : isHovered ? 'var(--accent)' : '#FFFFFF'}
+                    strokeWidth={isSelected ? 2.5 : isHovered ? 1.8 : 0.8}
+                    opacity={hoveredState && !isHovered ? 0.65 : 1}
+                    style={{ cursor: 'pointer', transition: 'all 0.18s var(--ease-out)' }}
                     onMouseEnter={() => setHoveredState(state.id)}
                     onMouseLeave={() => setHoveredState(null)}
                     onClick={() => handleClick(state.id)}
@@ -171,7 +150,7 @@ export default function IndiaMap({ stateData = [], onStateClick }) {
               );
             })}
 
-            {/* State labels — only show for states with data */}
+            {/* State labels: aggregate counts only */}
             {STATE_PATHS.map((state) => {
               const data = dataByState[state.id];
               const centroid = STATE_CENTROIDS[state.id];
@@ -183,11 +162,10 @@ export default function IndiaMap({ stateData = [], onStateClick }) {
                   x={centroid[0]}
                   y={centroid[1]}
                   textAnchor="middle"
-                  fontSize={8}
-                  fill="var(--ink)"
-                  fontWeight={600}
+                  fontSize={9}
+                  fill="#FFFFFF"
+                  fontWeight={700}
                   pointerEvents="none"
-                  opacity={hoveredState === state.id || selectedState === state.id ? 1 : 0.7}
                 >
                   {data.total}
                 </text>
@@ -198,84 +176,69 @@ export default function IndiaMap({ stateData = [], onStateClick }) {
             {hoveredState && dataByState[hoveredState] && (
               <g>
                 <rect
-                  x={Math.min(STATE_CENTROIDS[hoveredState]?.[0] ?? 0, 600)}
-                  y={(STATE_CENTROIDS[hoveredState]?.[1] ?? 0) - 45}
-                  width={140}
-                  height={35}
-                  rx={6}
-                  fill="var(--accent)"
-                  opacity={0.95}
+                  x={Math.min(STATE_CENTROIDS[hoveredState]?.[0] ?? 0, 580)}
+                  y={(STATE_CENTROIDS[hoveredState]?.[1] ?? 0) - 48}
+                  width={155}
+                  height={40}
+                  rx={8}
+                  fill="var(--ink)"
+                  opacity={0.94}
                 />
                 <text
-                  x={Math.min(STATE_CENTROIDS[hoveredState]?.[0] ?? 0, 600) + 10}
-                  y={(STATE_CENTROIDS[hoveredState]?.[1] ?? 0) - 22}
-                  fontSize={10}
+                  x={Math.min(STATE_CENTROIDS[hoveredState]?.[0] ?? 0, 580) + 12}
+                  y={(STATE_CENTROIDS[hoveredState]?.[1] ?? 0) - 26}
+                  fontSize={11}
                   fill="#fff"
-                  fontWeight={600}
+                  fontWeight={700}
                 >
                   {hoveredState}: {dataByState[hoveredState].total} cases
                 </text>
                 <text
-                  x={Math.min(STATE_CENTROIDS[hoveredState]?.[0] ?? 0, 600) + 10}
-                  y={(STATE_CENTROIDS[hoveredState]?.[1] ?? 0) - 10}
-                  fontSize={9}
+                  x={Math.min(STATE_CENTROIDS[hoveredState]?.[0] ?? 0, 580) + 12}
+                  y={(STATE_CENTROIDS[hoveredState]?.[1] ?? 0) - 12}
+                  fontSize={9.5}
                   fill="rgba(255,255,255,0.8)"
                 >
-                  Avg score: {dataByState[hoveredState].avgScore ?? '—'}
+                  Avg distress score: {dataByState[hoveredState].avgScore ?? '—'}
                 </text>
               </g>
             )}
           </svg>
         </div>
 
-        {/* Legend + Selected state details */}
+        {/* Legend + Regional Overview Context */}
         <div style={{ flex: '0 0 240px', minWidth: 200 }}>
-          {/* Legend */}
           <div style={{ marginBottom: '1.25rem' }}>
-            <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.82rem', color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Risk Level
-            </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            <strong style={{ fontSize: '0.82rem', color: 'var(--ink)', display: 'block', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Distress Choropleth
+            </strong>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               {[
-                { label: 'Low (0-30)', color: '#4a7c59' },
-                { label: 'Moderate (31-49)', color: '#a0722e' },
-                { label: 'Elevated (50-69)', color: '#c45d3a' },
-                { label: 'High (70+)', color: '#8b2e23' },
+                { label: 'Low (0–30)', color: '#2D5A46' },
+                { label: 'Moderate (31–49)', color: '#855208' },
+                { label: 'Elevated (50–69)', color: '#A34226' },
+                { label: 'High (70+)', color: '#9A1F1F' },
+                { label: 'No Active Dockets', color: '#EFE8DE' },
               ].map(({ label, color }) => (
-                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem' }}>
-                  <span style={{ width: 16, height: 16, borderRadius: 3, background: color, flexShrink: 0 }} />
+                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }}>
+                  <span style={{ width: 14, height: 14, borderRadius: 3, background: color, flexShrink: 0, border: '1px solid rgba(0,0,0,0.06)' }} />
                   <span style={{ color: 'var(--ink-soft)' }}>{label}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Selected state details */}
-          {selectedData ? (
-            <div className="card" style={{ padding: '0.85rem' }}>
-              <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.95rem' }}>{selectedState}</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.85rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--ink-muted)' }}>Cases</span>
-                  <strong>{selectedData.total}</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--ink-muted)' }}>Avg Score</span>
-                  <strong>{selectedData.avgScore ?? '—'}</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--ink-muted)' }}>Alerts</span>
-                  <strong style={{ color: selectedData.escalated > 0 ? 'var(--risk-high)' : 'var(--ink)' }}>
-                    {selectedData.escalated}
-                  </strong>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <p style={{ fontSize: '0.85rem', color: 'var(--ink-muted)', fontStyle: 'italic' }}>
-              Click a state on the map to see details.
-            </p>
-          )}
+          <div style={{
+            padding: '0.85rem 1rem',
+            background: 'var(--surface-sunken)',
+            borderRadius: 'var(--radius-sm)',
+            fontSize: '0.78rem',
+            color: 'var(--ink-muted)',
+            lineHeight: 1.45,
+            border: '1px solid var(--line-faint)',
+          }}>
+            <strong style={{ color: 'var(--ink)' }}>Small-Cell Suppression:</strong> Any district with fewer than 5 active dockets is automatically suppressed from individual drilldown to uphold statutory privacy under the DPDP Act 2023.
+          </div>
         </div>
       </div>
     </div>

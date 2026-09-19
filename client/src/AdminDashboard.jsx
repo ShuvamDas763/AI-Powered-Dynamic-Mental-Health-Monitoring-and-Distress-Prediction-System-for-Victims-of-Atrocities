@@ -41,7 +41,7 @@ const CustomPieTooltip = ({ active, payload }) => {
 export default function AdminDashboard() {
   const [summary, setSummary] = useState(null);
   const [trends, setTrends] = useState(null);
-  const [geoView, setGeoView] = useState('table');
+  const [geoView, setGeoView] = useState('map');
   const [geo, setGeo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(false);
