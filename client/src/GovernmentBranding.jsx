@@ -1,6 +1,6 @@
 /**
  * Government branding components — national emblem, ministry header, footer,
- * and unified accessible SVG icon library.
+ * and unified accessible SVG icon library for SAHARA.
  *
  * Provides the official identity layer for the SIH26094 prototype.
  * All text is factual and adheres to institutional public-sector standards.
@@ -8,8 +8,8 @@
 import { useI18n } from './i18n.jsx';
 
 /**
- * Ashoka Chakra — simplified SVG representation.
- * Used in the nav and login page as the national identity mark.
+ * Ashoka Chakra — refined accessible SVG representation.
+ * Used in the navigation and statutory identity marks.
  */
 export function AshokaChakra({ size = 32, color = 'currentColor', className = '' }) {
   return (
@@ -23,7 +23,7 @@ export function AshokaChakra({ size = 32, color = 'currentColor', className = ''
       aria-label="Ashoka Chakra"
       role="img"
     >
-      <circle cx="50" cy="50" r="46" stroke={color} strokeWidth="3" fill="none" />
+      <circle cx="50" cy="50" r="46" stroke={color} strokeWidth="3.5" fill="none" />
       <circle cx="50" cy="50" r="12" fill={color} />
       {Array.from({ length: 24 }, (_, i) => {
         const angle = (i * 15 * Math.PI) / 180;
@@ -39,7 +39,8 @@ export function AshokaChakra({ size = 32, color = 'currentColor', className = ''
             x2={x2}
             y2={y2}
             stroke={color}
-            strokeWidth="1.5"
+            strokeWidth="1.75"
+            strokeLinecap="round"
           />
         );
       })}
@@ -48,8 +49,8 @@ export function AshokaChakra({ size = 32, color = 'currentColor', className = ''
 }
 
 /**
- * Government header bar — Sahara trust strip.
- * Displays confidentiality assurance and counsellor availability.
+ * Government header bar — Sahara statutory trust strip.
+ * Displays confidentiality assurance and statutory framework reference.
  */
 export function GovernmentHeader() {
   const { locale, setLocale } = useI18n();
@@ -57,13 +58,13 @@ export function GovernmentHeader() {
     <header className="gov-header" role="banner">
       <div className="gov-header-inner">
         <div className="gov-header-left">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--secondary)" strokeWidth="2.2" aria-hidden="true">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--secondary)" strokeWidth="2.4" aria-hidden="true">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
           </svg>
           <span className="gov-header-portal">
             {locale === 'hi'
-              ? 'पूर्णतः गोपनीय व सुरक्षित संबल मंच · राष्ट्रीय अनुसूचित जाति/जनजाति सुरक्षा ढाँचा'
+              ? 'पूर्णतः गोपनीय व सुरक्षित संबल मंच · राष्ट्रीय अनुसूचित जाति/जनजाति (अ.नि.) अधिनियम सुरक्षा ढाँचा'
               : 'All communications are confidential & human-reviewed · SC/ST (PoA) Act, 1989 Framework'}
           </span>
         </div>
@@ -84,7 +85,7 @@ export function GovernmentHeader() {
 
 /**
  * Government footer — shown at the bottom of every page.
- * Standard government portal footer with disclaimer and links.
+ * Standard government portal footer with statutory disclaimer and emergency contacts.
  */
 export function GovernmentFooter() {
   return (
@@ -92,17 +93,19 @@ export function GovernmentFooter() {
       <div className="gov-footer-inner">
         <div className="gov-footer-left">
           <div className="gov-footer-text">
-            <span><strong>सहारा (Sahara)</strong> — Decision-support & dynamic well-being triage platform · Smart India Hackathon 2026.</span>
+            <span>
+              <strong>सहारा (SAHARA)</strong> — Dynamic Well-being Monitoring & Statutory Distress Decision-Support Platform · SIH 2026.
+            </span>
             <span className="gov-footer-sub">
               Statutory support coordination under the SC/ST (Prevention of Atrocities) Act, 1989.
-              Dedicated National Helplines: <strong style={{ color: 'var(--accent)' }}>14566</strong> (Toll-free) | Tele-MANAS: <strong style={{ color: 'var(--accent)' }}>14416</strong> | Emergency: <strong style={{ color: 'var(--risk-high)' }}>112</strong>
+              Dedicated National Helplines: <strong style={{ color: 'var(--accent)' }}>14566</strong> (PoA Assistance) | Tele-MANAS: <strong style={{ color: 'var(--accent)' }}>14416</strong> (24x7 Mental Health) | Emergency: <strong style={{ color: 'var(--risk-high)' }}>112</strong>
             </span>
           </div>
         </div>
         <div className="gov-footer-right">
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.78rem' }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--secondary)', display: 'inline-block' }} />
-            सत्यापित डेटा एन्क्रिप्शन (Encrypted local session active)
+            सत्यापित सत्र एन्क्रिप्शन (Encrypted Session Active)
           </span>
         </div>
       </div>
@@ -111,7 +114,7 @@ export function GovernmentFooter() {
 }
 
 /**
- * Institutional SVG icons — replacing emoji with accessible line-art style.
+ * Institutional SVG icons — accessible, uniform, stroke-based design.
  */
 
 export function IconCase({ size = 18, color = 'currentColor' }) {
